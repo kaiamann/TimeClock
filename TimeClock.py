@@ -316,7 +316,6 @@ def datetimeFromString(string: str):
 # Command line handlers
 
 def track(args):
-    print(args)
     timeClock = TimeClock.buildFromConfig()
     timeClock.track()
 
