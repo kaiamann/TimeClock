@@ -7,30 +7,43 @@ import csv
 import re
 import holidays
 from subprocess import call
-import pathlib
+import yaml
 
 
-DEFAULT_PATH = os.path.join(
-    "%s" % (os.path.expanduser('~')), "Documents", "Arbeitszeit")
-DEFAULT_PATH = pathlib.Path(__file__).parent.resolve()
-DEFAULT_FILENAME = "TimeClock.json"
-HOURS_PER_DAY = 6
-DAYS_OFF_PER_MONTH = 2.5
-
-
+# TODO: store the config file in the correct canonical location
+CONFIG_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), "config.yml")
 EDITOR = os.environ.get('EDITOR', 'code')
-LOCALE = "DE"
-local_holidays = holidays.country_holidays(LOCALE)
 
+# DEFAULT_PATH = os.path.expanduser('~')
+# DEFAULT_FILENAME = "TimeClock.json"
 
 class TimeClock:
-    def __init__(self, filepath: str = os.path.join(DEFAULT_PATH, DEFAULT_FILENAME)) -> None:
-        self.filepath = filepath
+    # TODO: pull params out of the dict into constructor signature
+    def __init__(self, config: dict) -> None:
+        # load config and copy values
+        self.dataDir = config['data_dir']
+        self.filename = config['file_name']
+        self.hoursPerDay = config['hours_per_day']
+        self.daysOffPerMonth = config['days_off_per_month']
+
+        # get the holidays for the locale
+        self.holidays = holidays.country_holidays(config['locale'])
+
+        # assemble the full path for more conventient usage
+        self.dataPath = os.path.join(self.dataDir, self.filename)
+
+        # load data from the JSON
         self.readData()
+
+    @staticmethod
+    def buildFromConfig(configPath: str = CONFIG_PATH):
+        f = open(configPath, mode='r', encoding="utf-8")
+        config = yaml.safe_load(f)
+        return TimeClock(config)
 
     def readData(self):
         try:
-            f = open(self.filepath)
+            f = open(self.dataPath)
             self.data = json.load(f)
             return True
         except Exception:
@@ -38,8 +51,12 @@ class TimeClock:
             return False
 
     def writeData(self, mode="w+", data: list = []):
-        f = open(self.filepath, mode, encoding="utf-8")
-        json.dump(data, f)
+        try:
+            f = open(self.dataPath, mode, encoding="utf-8")
+            json.dump(data, f)
+        except FileNotFoundError as e:
+            print(e)
+
 
     def isStarted(self):
         return self.data and not 'end' in self.data[-1]
@@ -84,8 +101,8 @@ class TimeClock:
 
     def track(self):
         now = datetime.now()
-        if now.date() in local_holidays:
-            now = findNextWorkday(now)
+        if now.date() in self.holidays:
+            now = self.findNextWorkday(now)
             print("Today is a free day moving to " + formatDate(now.date()))
             
         if self.isStarted():
@@ -121,17 +138,19 @@ class TimeClock:
         currentDay = start
         while currentDay <= end:
             # leave the day out if holiday or weekend
-            if (currentDay not in local_holidays) and (currentDay.weekday() not in [5,6]):
-                duration += timedelta(hours=HOURS_PER_DAY)
+            if (currentDay not in self.holidays) and (currentDay.weekday() not in [5,6]):
+                duration += timedelta(hours=self.hoursPerDay)
             currentDay += timedelta(days=1)
         return duration
 
-    def holidays(self, start: date, end: date):
+
+
+    def recentHolidays(self, start: date, end: date):
         recentHolidays = {}
         currentDay = start
         while currentDay <= end:
-            if currentDay in local_holidays:
-                recentHolidays[currentDay] = (local_holidays.get(currentDay))
+            if currentDay in self.holidays:
+                recentHolidays[currentDay] = (self.holidays.get(currentDay))
             currentDay += timedelta(days=1)
         
         return recentHolidays
@@ -229,7 +248,7 @@ class TimeClock:
 
     def exportMonth(self, month: datetime = datetime.now()):
         monthName = month.strftime("%B %Y")
-        exportFilepath = os.path.join(DEFAULT_PATH, "%s.csv" % (monthName))
+        exportFilepath = os.path.join(self.dataDir, "%s.csv" % (monthName))
 
         exportData = self.getExportData(month)
 
@@ -242,7 +261,13 @@ class TimeClock:
 
     def edit(self, editor: str):
         editor = editor if editor else EDITOR
-        call([editor, self.filepath])
+        call([editor, self.dataPath])
+
+
+    def findNextWorkday(self, d: datetime):
+        while (d.weekday() in [5,6]) or (d.date() in self.holidays):
+            d += timedelta(days=1)
+        return d
 
 
 def hasKeywords(slot, keywords):
@@ -254,10 +279,6 @@ def hasKeywords(slot, keywords):
             break
     return relevant
 
-def findNextWorkday(d: datetime):
-    while (d.weekday() in [5,6]) or (d.date() in local_holidays):
-        d += timedelta(days=1)
-    return d
 
 def readStdin():
     print("Enter description. Finish by pressing Ctrl+d")
@@ -295,50 +316,43 @@ def datetimeFromString(string: str):
 # Command line handlers
 
 def track(args):
-    args = argparser.parse_args()
-    config = vars(args)
-    timeClock = TimeClock(config["file"])
+    print(args)
+    timeClock = TimeClock.buildFromConfig()
     timeClock.track()
 
-def getWeek(inputDate: date):
-    start = inputDate - timedelta(days=inputDate.weekday())
-    end = start + timedelta(days=6)
-    return start, end
-
-def getMonth(inputDate: date):
-    start = inputDate - timedelta(days=inputDate.day-1)
-    nextMonth = inputDate.replace(day=28) + timedelta(days=4)
-    end = nextMonth - timedelta(days=nextMonth.day)
-    return start, end
 
 def summary(args):
-    args = argparser.parse_args()
-    config = vars(args)
-    timeClock = TimeClock(config["file"])
+    """Routine to print a summary for the chosen period
+
+    Args:
+        args (dict): The arguments from the argparser
+    """
+    args = vars(argparser.parse_args())
+    timeClock = TimeClock.buildFromConfig()
 
     # handle date
     inputDate = date.today()
-    if config['date']:
-        inputDate = datetime.strptime(config['date'], '%d %B %Y').date()
+    if args['date']:
+        inputDate = datetime.strptime(args['date'], '%d %B %Y').date()
 
     # default to day mode
     start = inputDate
     end = inputDate
 
     # set start end end for multi day modes
-    if config['week']:
+    if args['week']:
         start, end = getWeek(inputDate)
-    if config['month']:
+    if args['month']:
         start, end = getMonth(inputDate)
 
     # handle keywords
     keywords = []
-    if config['keywords']:
-        keywords = re.split(' ', config['keywords'])
+    if args['keywords']:
+        keywords = re.split(' ', args['keywords'])
 
     duration = timeClock.summary(start, end, keywords)
     tbd = timeClock.toBeDone(start, end)
-    recentHolidays = timeClock.holidays(start, end)
+    recentHolidays = timeClock.recentHolidays(start, end)
 
     if duration > tbd:
         pass
@@ -360,45 +374,117 @@ def summary(args):
 
 
 def export(args):
-    args = argparser.parse_args()
-    config = vars(args)
-    timeClock = TimeClock(config["file"])
+    args = vars(argparser.parse_args())
+    timeClock = TimeClock.buildFromConfig()
 
     if not timeClock.isStarted():
-        month = datetime.strptime(
-            config['month'], "%B %Y") if config['month'] else datetime.now()
+        month = datetime.strptime(args['month'], "%B %Y") if args['month'] else datetime.now()
         timeClock.exportMonth(month)
     else:
         print("Please finish the current work session before trying to export.")
     pass
 
 def edit(args):
-    args = argparser.parse_args()
-    config = vars(args)
-    timeClock = TimeClock(config["file"])
-    timeClock.edit(config['editor'])
+    """Routine to edit the JSON file with the chosen editor
+
+    Args:
+        args (dict): The args from the argparser
+    """
+    args = vars(argparser.parse_args())
+    timeClock = TimeClock.buildFromConfig()
+    timeClock.edit(args['editor'])
 
 
 def ls(args):
-    args = argparser.parse_args()
-    config = vars(args)
-    timeClock = TimeClock(config["file"])
-
+    args = vars(argparser.parse_args())
+    timeClock = TimeClock.buildFromConfig()
 
     # handle date
     date = datetime.now().date()
     mode = None
-    if config['date']:
-        date, mode = parseDate(config['date'])
+    if args['date']:
+        date, mode = parseDate(args['date'])
 
     # handle keywords
     keywords = []
-    if config['keywords']:
-        keywords = re.split(' ', config['keywords'])
+    if args['keywords']:
+        keywords = re.split(' ', args['keywords'])
 
     res = timeClock.ls(mode, date, keywords)
     print(res)
     return res
+
+
+def init(args):
+    """Initializes the TimeClock
+
+    Asks the user for important configuration parameters:
+
+    data_dir: The directory where the JSON file is stored
+    file_name: The name of the JSON file
+    work_hours_per_day: duh
+    days_off_per_month: duh
+    locale: The current locale of the user to fetch local holidays
+
+    Args:
+        args (dirct): The arguments from the argparser
+    """
+    dataDir = os.path.join(os.path.expanduser('~'),"Documents","TimeClock")
+    filename = "TimeClock.json"
+
+    print("Enter the path to the directory where the file tracking the working hours should be stored.")
+    print("You can also leave it blank to default to %s" % (os.path.join(dataDir)))
+    userInput = input()
+    while not os.path.exists(userInput):
+        if not userInput:
+            userInput = dataDir
+            break
+        print("%s is not a valid directory. Please provide a valid path" % (userInput))
+        userInput = input()
+    dataDir = userInput
+
+    # this recursicely creates the directory if it doesn't exist already
+    os.makedirs(dataDir, exist_ok=True)
+
+    config = {}
+    config['data_dir'] = dataDir
+    config['file_name'] = filename
+
+    # Get working hours per day
+    print("Please enter the amount of hours you work per day:")
+    userInput = input() 
+    while not userInput.isnumeric():
+        print("Please input a number. E.g. 6")
+        userInput = input()
+    config['hours_per_day'] = float(userInput)
+
+
+    # Get days off per month
+    print("Please enter the amount of days off per month per day: ") 
+    userInput = input()
+    while not userInput.isnumeric():
+        print("Please input a number. E.g. 2.5")
+        userInput = input()
+    config['days_off_per_month'] = float(userInput)
+
+    # get locale
+    locales = holidays.list_supported_countries()
+    print("Please enter your locale")
+    print("For a list of available locales type list")
+    userInput = input() 
+    while not userInput in locales.keys():
+        if userInput == "list":
+            print(', '.join(locales.keys()))
+            userInput = ""
+            continue
+        print("Please choose one of the shown locaes. E.g. DE")
+        userInput = input()
+    config['locale'] = userInput
+
+    # dump to config.yml
+    f = open(CONFIG_PATH, "w+", encoding="utf-8")
+    yaml.dump(config, f)
+
 
 def parseDate(dateStr: str):
     if type(dateStr) != str:
@@ -423,28 +509,27 @@ def parseDate(dateStr: str):
 
     raise ValueError
 
+def getWeek(inputDate: date):
+    start = inputDate - timedelta(days=inputDate.weekday())
+    end = start + timedelta(days=6)
+    return start, end
 
-
+def getMonth(inputDate: date):
+    start = inputDate - timedelta(days=inputDate.day-1)
+    nextMonth = inputDate.replace(day=28) + timedelta(days=4)
+    end = nextMonth - timedelta(days=nextMonth.day)
+    return start, end
 
 
 if __name__ == '__main__':
 
     # for date, name in sorted(holidays.US(subdiv='CA', years=2014).items()):
-
-
     argparser = argparse.ArgumentParser(
         prog='timeClock',
         description='A time clock for keeping track of working hours.',
         epilog='Calling without arguments will start the tracking process'
     )
 
-    argparser.add_argument(
-        '-f',
-        '--file',
-        default=os.path.join(DEFAULT_PATH, DEFAULT_FILENAME),
-        help='the path to the file where time clock information should be saved in. Defaults to %s' % (
-            os.path.join(DEFAULT_PATH, DEFAULT_FILENAME))
-    )
     argparser.set_defaults(func=track)
 
     subparsers = argparser.add_subparsers(
@@ -491,6 +576,15 @@ if __name__ == '__main__':
         help='Edit the JSON file storing the timeslots using the specefied editor'
     )
     editParser.set_defaults(func=edit)
+
+    # init
+    initParser = subparsers.add_parser("init")
+    initParser.add_argument(
+        '-i',
+        '--init',
+        help='Initialize the TimeClock'
+    )
+    initParser.set_defaults(func=init)
 
     # ls
     lsParser = subparsers.add_parser("ls")
