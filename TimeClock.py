@@ -431,53 +431,78 @@ def init(args):
     dataDir = os.path.join(os.path.expanduser('~'),"Documents","TimeClock")
     filename = "TimeClock.json"
 
-    print("Enter the path to the directory where the file tracking the working hours should be stored.")
-    print("You can also leave it blank to default to %s" % (os.path.join(dataDir)))
-    userInput = input()
-    while not os.path.exists(userInput):
-        if not userInput:
-            userInput = dataDir
-            break
-        print("%s is not a valid directory. Please provide a valid path" % (userInput))
-        userInput = input()
-    dataDir = userInput
-
-    # this recursicely creates the directory if it doesn't exist already
-    os.makedirs(dataDir, exist_ok=True)
 
     config = {}
-    config['data_dir'] = dataDir
     config['file_name'] = filename
+
+    print("Enter the path to the directory where the file tracking the working hours should be stored.")
+    print("You can also leave it blank to default to %s" % (os.path.join(dataDir)))
+    while True:
+        userInput = input()
+        if not userInput:
+            userInput = dataDir
+        try:
+            # TODO: ideally we would check if the entered dirpath is actually sensible, but whatever \o.o/
+            # @see https://stackoverflow.com/questions/9532499/check-whether-a-path-is-valid-in-python-without-creating-a-file-at-the-paths-ta
+            # this recursicely creates the directory if it doesn't exist already
+            os.makedirs(userInput, exist_ok=True)
+            break
+        except KeyboardInterrupt:
+            return
+        except Exception:
+            print("%s is not a valid directory. Please provide a valid path" % (userInput))
+
+    config['data_dir'] = userInput
 
     # Get working hours per day
     print("Please enter the amount of hours you work per day:")
-    userInput = input() 
-    while not userInput.isnumeric():
-        print("Please input a number. E.g. 6")
-        userInput = input()
-    config['hours_per_day'] = float(userInput)
+    while True:
+        try:
+            userInput = input()
+            if not userInput:
+                raise ValueError
+            userInput = float(userInput)
+            break
+        except ValueError:
+            print("Please input a number. E.g. 6")
+            continue
+        except KeyboardInterrupt:
+            return
 
+    config['hours_per_day'] = userInput
 
     # Get days off per month
     print("Please enter the amount of days off per month per day: ") 
-    userInput = input()
-    while not userInput.isnumeric():
-        print("Please input a number. E.g. 2.5")
-        userInput = input()
-    config['days_off_per_month'] = float(userInput)
+    while True:
+        try:
+            userInput = input()
+            if not userInput:
+                raise ValueError
+            userInput = float(userInput)
+            break
+        except ValueError:
+            print("Please input a number. E.g. 2.5")
+            continue
+        except KeyboardInterrupt:
+            return
+
+    config['days_off_per_month'] = userInput
 
     # get locale
     locales = holidays.list_supported_countries()
     print("Please enter your locale")
     print("For a list of available locales type list")
-    userInput = input() 
-    while not userInput in locales.keys():
+    while True:
+        userInput = input() 
         if userInput == "list":
             print(', '.join(locales.keys()))
             userInput = ""
             continue
-        print("Please choose one of the shown locaes. E.g. DE")
-        userInput = input()
+        if not userInput in locales.keys():
+           print("Please choose one of the available locales. E.g. DE")
+           continue
+        break
+        
     config['locale'] = userInput
 
     # dump to config.yml
