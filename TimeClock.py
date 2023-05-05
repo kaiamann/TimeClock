@@ -8,6 +8,9 @@ import re
 import holidays
 from subprocess import call
 import yaml
+import pycountry
+import inquirer
+import pyfiglet
 
 
 # TODO: store the config file in the correct canonical location
@@ -26,8 +29,10 @@ class TimeClock:
         self.hoursPerDay = config['hours_per_day']
         self.daysOffPerMonth = config['days_off_per_month']
 
+        # see if there was a subdiv
+        subdiv = config['locale_subdiv'] if 'locale_subdiv' in config else None
         # get the holidays for the locale
-        self.holidays = holidays.country_holidays(config['locale'])
+        self.holidays = holidays.country_holidays(config['locale'], subdiv=subdiv)
 
         # assemble the full path for more conventient usage
         self.dataPath = os.path.join(self.dataDir, self.filename)
@@ -428,83 +433,75 @@ def init(args):
     Args:
         args (dirct): The arguments from the argparser
     """
-    dataDir = os.path.join(os.path.expanduser('~'),"Documents","TimeClock")
-    filename = "TimeClock.json"
+    figlet = pyfiglet.Figlet(font="big")
+    print(figlet.renderText("TimeClock"))
 
-
-    config = {}
-    config['file_name'] = filename
-
-    print("Enter the path to the directory where the file tracking the working hours should be stored.")
-    print("You can also leave it blank to default to %s" % (os.path.join(dataDir)))
-    while True:
-        userInput = input()
-        if not userInput:
-            userInput = dataDir
-        try:
-            # TODO: ideally we would check if the entered dirpath is actually sensible, but whatever \o.o/
-            # @see https://stackoverflow.com/questions/9532499/check-whether-a-path-is-valid-in-python-without-creating-a-file-at-the-paths-ta
-            # this recursicely creates the directory if it doesn't exist already
-            os.makedirs(userInput, exist_ok=True)
-            break
-        except KeyboardInterrupt:
-            return
-        except Exception:
-            print("%s is not a valid directory. Please provide a valid path" % (userInput))
-
-    config['data_dir'] = userInput
-
-    # Get working hours per day
-    print("Please enter the amount of hours you work per day:")
-    while True:
-        try:
-            userInput = input()
-            if not userInput:
-                raise ValueError
-            userInput = float(userInput)
-            break
-        except ValueError:
-            print("Please input a number. E.g. 6")
-            continue
-        except KeyboardInterrupt:
-            return
-
-    config['hours_per_day'] = userInput
-
-    # Get days off per month
-    print("Please enter the amount of days off per month per day: ") 
-    while True:
-        try:
-            userInput = input()
-            if not userInput:
-                raise ValueError
-            userInput = float(userInput)
-            break
-        except ValueError:
-            print("Please input a number. E.g. 2.5")
-            continue
-        except KeyboardInterrupt:
-            return
-
-    config['days_off_per_month'] = userInput
-
-    # get locale
     locales = holidays.list_supported_countries()
-    print("Please enter your locale")
-    print("For a list of available locales type list")
-    while True:
-        userInput = input() 
-        if userInput == "list":
-            print(', '.join(locales.keys()))
-            userInput = ""
-            continue
-        if not userInput in locales.keys():
-           print("Please choose one of the available locales. E.g. DE")
-           continue
-        break
-        
-    config['locale'] = userInput
+    # filter out all the country codes that don't exist in pycountry
+    countryCodes = list(filter(lambda x: pycountry.countries.get(alpha_2=x), locales))
+    countryNames = list(sorted(map(lambda x: pycountry.countries.get(alpha_2=x).name, countryCodes)))
 
+    questions = [
+        inquirer.Path('data_dir',
+                        message= "In which directory should the data be stored?",
+                        default= os.path.join(os.path.expanduser('~'),"Documents","TimeClock") + os.path.sep
+                    ),
+        inquirer.Path('file_name',
+                        message= "What shoud the file be named?",
+                        default= "TimeClock.json"
+                    ),
+        inquirer.List('hours_per_day',
+                        message="How many hours to you work per day?",
+                        choices=range(1,9,1),
+                    ),
+        inquirer.List('days_off_per_month',
+                        message="How many days do you have off per month?",
+                        choices=list(map(lambda x: x/2, range(1,7,1))),
+                    ),
+        inquirer.List('locale',
+                        message="Where do you live?",
+                        choices=countryNames,
+                    ),
+        ]
+    config = inquirer.prompt(questions)
+
+    if not config:
+        return
+
+    # write the country code    
+    country = pycountry.countries.get(name=config['locale'])
+    countryCode= country.alpha_2
+    config['locale'] = countryCode
+
+    subdivCodes = locales[country.alpha_2]
+
+    # filter the ones that are not in holiday subdivs
+    if subdivCodes:
+        subdivType = list(pycountry.subdivisions.get(country_code=countryCode))[0].type
+        # filter the ones that dont have a name...
+        # TODO: figure out why some do not exist
+        subdivCodes = list(filter(lambda x: pycountry.subdivisions.get(code="%s-%s" % (countryCode, x)),subdivCodes))
+        def f(code):
+            name = pycountry.subdivisions.get(code="%s-%s" % (countryCode, code)).name
+            return (name, code)
+
+        subdivMap = dict(map(f, subdivCodes))
+        subdivNames = list(sorted(subdivMap.keys()))
+
+        questions = [
+            inquirer.List('subdiv',
+                            message="In which %s do you live?" % (subdivType),
+                            choices=subdivNames,
+                        )
+        ]
+        subdivConfig = inquirer.prompt(questions)
+
+        if not subdivConfig:
+            return
+        
+        config['locale_subdiv'] = subdivMap[subdivConfig['subdiv']]
+        
+    print(config)
     # dump to config.yml
     f = open(CONFIG_PATH, "w+", encoding="utf-8")
     yaml.dump(config, f)
