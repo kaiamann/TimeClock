@@ -11,6 +11,7 @@ import yaml
 import pycountry
 import inquirer
 import pyfiglet
+import git
 
 
 # TODO: store the config file in the correct canonical location
@@ -36,6 +37,8 @@ class TimeClock:
 
         # assemble the full path for more conventient usage
         self.dataPath = os.path.join(self.dataDir, self.filename)
+
+        self.repo = getGitRepoWithRemote(self.dataDir)
 
         # load data from the JSON
         self.readData()
@@ -138,6 +141,25 @@ class TimeClock:
         
         return duration
     
+    def commit(self):
+        # get changed files
+        changedFiles = list(item.a_path for item in self.repo.index.diff(None))
+        if len(changedFiles) < 1:
+            print("Nothing to commit. Aborting")
+            return
+
+        if isBehind(self.repo):
+            print("Your repo seems to be behind the remote. Please pull first.")
+
+        # add modified files
+        self.repo.index.add(changedFiles)
+        # and commit
+        self.repo.index.commit("Added working hours for %s" % (formatDate(date.today())))
+        print(self.repo.head.commit.message)
+
+    def push(self):
+        self.repo.git.push()
+    
     def toBeDone(self, start: date, end: date):
         duration = timedelta()
         currentDay = start
@@ -147,7 +169,6 @@ class TimeClock:
                 duration += timedelta(hours=self.hoursPerDay)
             currentDay += timedelta(days=1)
         return duration
-
 
 
     def recentHolidays(self, start: date, end: date):
@@ -182,8 +203,6 @@ class TimeClock:
                 return slot
         return None
         
-    
-    
     
     def ls(self, mode: str|None, date: date, keywords : list = []):
         # maps the input type to the correct values 
@@ -317,6 +336,30 @@ def formatDatetime(date: datetime):
 def datetimeFromString(string: str):
     return datetime.strptime(string, "%d %B %Y %H:%M")
 
+def getGitRepoWithRemote(path: str):
+    remote = None
+    try:
+        repo = git.Repo(path)
+    except git.InvalidGitRepositoryError:
+        print("%s is not a git repository. Git functionality not available." % (path))
+        return repo
+
+    # also check if there is a remote
+    if not repo.remotes:
+        print("The git repository at %s does not seem to have a remote. Git functionality not available." % (path))
+        return repo
+
+    remote = repo.remotes[0]
+    # fetch from remote
+    remote.fetch()
+
+    return repo
+
+def isBehind(repo: git.Repo):
+    # see if we're behind the remote
+    commits_behind = repo.iter_commits('main..origin/main')
+    return sum(1 for _ in commits_behind) > 0
+
 
 # Command line handlers
 
@@ -324,6 +367,13 @@ def track(args):
     timeClock = TimeClock.buildFromConfig()
     timeClock.track()
 
+def commit(args):
+    timeClock = TimeClock.buildFromConfig()
+    timeClock.commit()
+
+def push(args):
+    timeClock = TimeClock.buildFromConfig()
+    timeClock.push()
 
 def summary(args):
     """Routine to print a summary for the chosen period
@@ -433,12 +483,14 @@ def init(args):
     Args:
         args (dirct): The arguments from the argparser
     """
+    # print header
     figlet = pyfiglet.Figlet(font="big")
     print(figlet.renderText("TimeClock"))
 
     locales = holidays.list_supported_countries()
     # filter out all the country codes that don't exist in pycountry
     countryCodes = list(filter(lambda x: pycountry.countries.get(alpha_2=x), locales))
+    # get the country names
     countryNames = list(sorted(map(lambda x: pycountry.countries.get(alpha_2=x).name, countryCodes)))
 
     questions = [
@@ -453,10 +505,12 @@ def init(args):
         inquirer.List('hours_per_day',
                         message="How many hours to you work per day?",
                         choices=range(1,9,1),
+                        default=8
                     ),
         inquirer.List('days_off_per_month',
                         message="How many days do you have off per month?",
-                        choices=list(map(lambda x: x/2, range(1,7,1))),
+                        choices=list(map(lambda x: x/2, range(0,7,1))),
+                        default=3
                     ),
         inquirer.List('locale',
                         message="Where do you live?",
@@ -465,21 +519,26 @@ def init(args):
         ]
     config = inquirer.prompt(questions)
 
+    # do nothing if no config
     if not config:
         return
-
-    # write the country code    
+    
+    # get the country code from the human readable name
     country = pycountry.countries.get(name=config['locale'])
     countryCode= country.alpha_2
+    # save the code instead of the name
     config['locale'] = countryCode
 
+    # get the subdivs from the  holidays module
     subdivCodes = locales[country.alpha_2]
 
     # filter the ones that are not in holiday subdivs
     if subdivCodes:
+        # get the name of subdiv type. E.g. "Kanton", "State", etc.
         subdivType = list(pycountry.subdivisions.get(country_code=countryCode))[0].type
+
         # filter the ones that dont have a name...
-        # TODO: figure out why some do not exist
+        # TODO: some subdivs have a three letter code... figure out what's up with that
         subdivCodes = list(filter(lambda x: pycountry.subdivisions.get(code="%s-%s" % (countryCode, x)),subdivCodes))
         def f(code):
             name = pycountry.subdivisions.get(code="%s-%s" % (countryCode, code)).name
@@ -620,6 +679,15 @@ if __name__ == '__main__':
         help='Provides a summary for all slots that have particular keywords in their decription'
     )
     lsParser.set_defaults(func=ls)
+
+
+    # commit
+    commitParser = subparsers.add_parser("commit")
+    commitParser.set_defaults(func=commit)
+
+    # push
+    pushParser = subparsers.add_parser("push")
+    pushParser.set_defaults(func=push)
     
     # read the handler and execute
     args = argparser.parse_args()
