@@ -1,5 +1,6 @@
 from datetime import timedelta, datetime, date
 
+
 def readStdin():
     import sys
     print("Enter description. Finish by pressing Ctrl+d")
@@ -7,6 +8,7 @@ def readStdin():
     for line in sys.stdin:
         message += line
     return message
+
 
 # Date and duration formatting
 def formatDuration(duration: timedelta):
@@ -21,28 +23,35 @@ def formatDuration(duration: timedelta):
 
     return "%s%0.f Hours %0.f Minutes" % (sign, hours, minutes)
 
+
 def formatDate(date: date):
     return date.strftime("%d %B %Y")
+
 
 def formatTime(date: datetime):
     return date.strftime("%H:%M")
 
+
 def formatDatetime(date: datetime):
     return date.strftime("%d %B %Y %H:%M")
 
+
 def datetimeFromString(string: str):
     return datetime.strptime(string, "%d %B %Y %H:%M")
+
 
 def getWeek(inputDate: date):
     start = inputDate - timedelta(days=inputDate.weekday())
     end = start + timedelta(days=6)
     return start, end
 
+
 def getMonth(inputDate: date):
     start = inputDate - timedelta(days=inputDate.day-1)
     nextMonth = inputDate.replace(day=28) + timedelta(days=4)
     end = nextMonth - timedelta(days=nextMonth.day)
     return start, end
+
 
 def parseDate(dateStr: str):
     if type(dateStr) != str:
@@ -66,3 +75,13 @@ def parseDate(dateStr: str):
         pass
 
     raise ValueError
+
+
+def hasKeywords(slot, keywords):
+    # Filter for relevant keywords
+    relevant = True
+    for keyword in keywords:
+        if 'description' not in slot or keyword not in slot['description']:
+            relevant = False
+            break
+    return relevant

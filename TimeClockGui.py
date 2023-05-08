@@ -1,14 +1,14 @@
 import PySimpleGUI as sg
 import os.path
 import sys
-import TimeClock
+import timeclock
 from datetime import datetime, timedelta
 
 
 # First the window layout in 2 columns
 sg.theme("DarkAmber")
 
-timeclock = TimeClock.TimeClock()
+timeclock = timeclock.TimeClock()
 yl = timeclock.ls("year", datetime.now()) 
 
 explorer_frame = [
@@ -109,18 +109,18 @@ while True:
                 window["-HELP-"].update("Action:")
                 window["-TOUT-"].update("Navigate up")
                 continue
-            date, mode = TimeClock.parseDate(dateStr)
+            date, mode = timeclock.parseDate(dateStr)
 
             start = date
             end = date
 
             if date and mode == "slot":
                 slot = timeclock.getSlot(dateStr)
-                duration = TimeClock.datetimeFromString(slot['end']) - TimeClock.datetimeFromString(slot['start'])
+                duration = timeclock.datetimeFromString(slot['end']) - timeclock.datetimeFromString(slot['start'])
                 description = ""
                 if 'description' in slot:
                     description = slot['description']
-                window["-TOUT-"].update(TimeClock.formatDuration(duration))
+                window["-TOUT-"].update(timeclock.formatDuration(duration))
                 window["-START-"].update(slot['start'])
                 window["-END-"].update(slot['end'])
                 window["-DESCRIPTION-"].update(description)
@@ -134,14 +134,14 @@ while True:
             if date and mode == "day":
                 end = date + timedelta(days=1)
             if date and mode == "week":
-                start, end = TimeClock.getWeek(date)
+                start, end = timeclock.getWeek(date)
             if date and mode == "month":
-                start, end = TimeClock.getMonth(date)
+                start, end = timeclock.getMonth(date)
             if date and mode == "year":
                 end = date + timedelta(days=356)
 
             duration = timeclock.summary(start, end)
-            window["-TOUT-"].update(TimeClock.formatDuration(duration))
+            window["-TOUT-"].update(timeclock.formatDuration(duration))
 
 
         # except Exception as e:
@@ -157,7 +157,7 @@ while True:
             if dateStr == "..":
                 dateStr = ' '.join(context.split(" ")[1:])
 
-            date, mode = TimeClock.parseDate(dateStr)
+            date, mode = timeclock.parseDate(dateStr)
 
             if mode == "slot":
                 continue
@@ -190,9 +190,9 @@ while True:
         if oldStart == "":
             oldStart = values['-START-']
             print("Start didnt change")
-        date = TimeClock.datetimeFromString(oldStart)
-        start = TimeClock.datetimeFromString(values["-START-"])
-        end = TimeClock.datetimeFromString(values["-END-"])
+        date = timeclock.datetimeFromString(oldStart)
+        start = timeclock.datetimeFromString(values["-START-"])
+        end = timeclock.datetimeFromString(values["-END-"])
         description = values["-DESCRIPTION-"]
 
         timeclock.updateSlot(date, start, end, description)
