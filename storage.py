@@ -3,28 +3,35 @@
 Provides a general interface, as well as a JSON implementation.
 """
 
-from typing_extensions import override
-from utils import datetimeFromString, formatDatetime, hasKeywords
-from datetime import date, datetime
 import json
 import os
 from abc import ABC, abstractmethod
+from datetime import date, datetime
 from subprocess import call
+from typing_extensions import override
+from utils import datetime_from_string, format_datetime, has_keywords
 
 EDITOR = os.environ.get('EDITOR', 'code')
+
+
+class InvalidStorageException(Exception):
+    """Error indicating that the storage is badly configured."""
 
 
 class Storage(ABC):
     """An interface that takes care of storing working hours in slots."""
 
     @abstractmethod
-    def __init__(self, dataDir: str, filename: str) -> None:
+    def __init__(self, data_dir: str, filename: str) -> None:
         """Initialize the storage.
 
         Args:
             dataDir (str): The path to the directory in which
             the file should be stored.
             filename (str): The name of the data file.
+        
+        Raises:
+            InvalidStorageException: When the file is not loadable.
         """
         super().__init__()
 
@@ -34,7 +41,6 @@ class Storage(ABC):
         Returns:
             bool: True if successful, False otherwise.
         """
-        pass
 
     def save(self) -> bool:
         """Save the data to the data file.
@@ -42,17 +48,15 @@ class Storage(ABC):
         Returns:
             bool: True if successful, false otherwise.
         """
-        pass
 
-    def createSlot(self, start: datetime) -> None:
+    def create_slot(self, start: datetime) -> None:
         """Create a new slot.
 
         Args:
             start (datetime): The start time.
         """
-        pass
 
-    def getSlot(self, start: datetime) -> dict | None:
+    def get_slot(self, start: datetime) -> dict | None:
         """Get a specific slot.
 
         Args:
@@ -61,13 +65,12 @@ class Storage(ABC):
         Returns:
             dict|None: The slot with the specified start time, None otherwise.
         """
-        pass
 
-    def editSlot(self,
-                 oldStart: datetime,
-                 newStart: datetime,
-                 end: datetime,
-                 description: str) -> bool:
+    def edit_slot(self,
+                  old_start: datetime,
+                  new_start: datetime,
+                  end: datetime,
+                  description: str) -> bool:
         """Edit a specific slot.
 
         Args:
@@ -79,9 +82,15 @@ class Storage(ABC):
         Returns:
             bool: True if successful, false otherwise.
         """
-        pass
 
-    def deleteSlot(self, start: datetime) -> bool:
+    def edit(self, editor: str) -> None:
+        """Directly edit the storage with an editor.
+
+        Args:
+            editor (string): The editor to be used.
+        """
+
+    def delete_slot(self, start: datetime) -> bool:
         """Delete a specific slot.
 
         Args:
@@ -90,17 +99,15 @@ class Storage(ABC):
         Returns:
             bool: True if successful, False otherwise.
         """
-        pass
 
-    def getLastSlot(self) -> dict | None:
+    def get_last_slot(self) -> dict | None:
         """Get the newest slot in the dataset.
 
         Returns:
             dict|None: The newest slot, or None if data is empty.
         """
-        pass
 
-    def getSlotsBetween(self, start: date, end: date, keyword=[]) -> list:
+    def get_slots_between(self, start: date, end: date, keywords=None) -> list:
         """Get all slots in a speficic timeframe.
 
         Args:
@@ -112,124 +119,128 @@ class Storage(ABC):
         Returns:
             list: The list of slots in the timeframe.
         """
-        pass
 
 
 class JSONStorage(Storage):
-    """An impementation of the Storage interface that
-    uses a JSON file to store working hours."""
+    """A Storage implementation that a JSON file."""
 
     @override
     def __init__(self, dataDir: str, fileName: str) -> None:
-        self.dataDir = dataDir
+        self.data_dir = dataDir
         self.filename = fileName
 
-        self.dataPath = os.path.join(dataDir, fileName)
+        self.data_path = os.path.join(dataDir, fileName)
         self.data = []
-        self.load()
+        try:
+            self.load()
+        except FileNotFoundError:
+            # create the dir if it does not exist yet
+            os.makedirs(self.data_dir, exist_ok=True)
+            # create an empty file there
+            self.save()
+        except json.decoder.JSONDecodeError as err:
+            message = f"{self.data_path} is not a valid JSON file."
+            raise InvalidStorageException(message) from err
 
     @override
     def load(self) -> bool:
-        try:
-            f = open(self.dataPath)
-            self.data = json.load(f)
+        with open(self.data_path, "r", encoding="utf-8") as file:
+            self.data = json.load(file)
             return True
-        except Exception:
-            self.data = []
-            return False
+        return False
 
     @override
     def save(self, mode="w+") -> bool:
         try:
-            f = open(self.dataPath, mode, encoding="utf-8")
-            json.dump(self.data, f)
-            return True
+            with open(self.data_path, mode, encoding="utf-8") as file:
+                json.dump(self.data, file)
+                return True
         except FileNotFoundError:
             print("Error writing data")
             return False
 
     @override
-    def createSlot(self, start: datetime) -> None:
-        formattedDatetime = formatDatetime(start)
-        slot = {"start": formattedDatetime}
+    def create_slot(self, start: datetime) -> None:
+        formatted_start = format_datetime(start)
+        slot = {"start": formatted_start}
         self.data.append(slot)
 
     @override
-    def getSlot(self, start: datetime) -> dict | None:
+    def get_slot(self, start: datetime) -> dict | None:
         for slot in self.data:
             if slot['start'] == start:
                 return slot
         return None
 
     @override
-    def editSlot(self,
-                 dt: datetime,
-                 start: datetime,
-                 end: datetime,
-                 description: str
-                 ):
-        for i in range(len(self.data)):
-            slot = self.data[i]
-            slotStart = datetimeFromString(slot['start'])
-            if slotStart == dt:
-                self.data[i]['start'] = formatDatetime(start)
-                self.data[i]['end'] = formatDatetime(end)
+    def edit_slot(self,
+                  old_start: datetime,
+                  new_start: datetime,
+                  end: datetime,
+                  description: str
+                  ):
+        for i, slot in enumerate(self.data):
+            slot_start = datetime_from_string(slot['start'])
+            if slot_start == old_start:
+                self.data[i]['start'] = format_datetime(new_start)
+                self.data[i]['end'] = format_datetime(end)
                 self.data[i]['description'] = description
                 return True
         return False
 
     @override
-    def deleteSlot(self, start: datetime):
+    def delete_slot(self, start: datetime):
         for slot in self.data:
-            slotStart = datetimeFromString(slot['start'])
-            if start == slotStart:
+            slot_start = datetime_from_string(slot['start'])
+            if start == slot_start:
                 self.data.remove(slot)
                 return True
         return False
 
     @override
-    def getLastSlot(self):
+    def get_last_slot(self):
         if not self.data:
             return None
 
         slot = self.data[-1]
 
-        parsedSlot = {}
-        parsedSlot['start'] = datetimeFromString(slot["start"])
+        parsed_slot = {}
+        parsed_slot['start'] = datetime_from_string(slot["start"])
         if "end" in slot:
-            parsedSlot['end'] = datetimeFromString(slot["end"])
+            parsed_slot['end'] = datetime_from_string(slot["end"])
 
         if "description" in slot:
-            parsedSlot['description'] = slot['description']
+            parsed_slot['description'] = slot['description']
 
-        return parsedSlot
+        return parsed_slot
 
     @override
-    def getSlotsBetween(self,
-                        start: datetime,
-                        end: datetime,
-                        keywords: list = []) -> list:
+    def get_slots_between(self,
+                          start: datetime,
+                          end: datetime,
+                          keywords: list = None) -> list:
         slots = []
         for slot in self.data:
-            if not hasKeywords(slot, keywords):
+            if not has_keywords(slot, keywords):
                 continue
 
-            slotStart = datetimeFromString(slot["start"])
-            slotStartDate = slotStart.date()
+            slot_start = datetime_from_string(slot["start"])
+            slot_start_date = slot_start.date()
 
-            slotEnd = datetime.now()
+            slot_end = datetime.now()
             if "end" in slot:
-                slotEnd = datetimeFromString(slot["end"])
+                slot_end = datetime_from_string(slot["end"])
 
-            if slotStartDate >= start and slotStartDate <= end:
-                parsedSlot = {}
-                parsedSlot['start'] = slotStart
-                parsedSlot['end'] = slotEnd
-                parsedSlot['description'] = slot['description']
-                slots.append(parsedSlot)
+            if slot_start_date >= start and slot_start_date <= end:
+                parsed_slot = {}
+                parsed_slot['start'] = slot_start
+                parsed_slot['end'] = slot_end
+                if 'description' in slot:
+                    parsed_slot['description'] = slot['description']
+                slots.append(parsed_slot)
         return slots
 
     @override
     def edit(self, editor: str):
         editor = editor if editor else EDITOR
-        call([editor, self.dataPath])
+        call([editor, self.data_path])

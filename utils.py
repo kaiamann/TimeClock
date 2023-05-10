@@ -1,8 +1,18 @@
-from datetime import timedelta, datetime, date
+"""A module containing various heler methods"""
+import sys
+from datetime import (
+    timedelta as Timedelta,
+    datetime as Datetime,
+    date as Date,
+)
 
 
-def readStdin():
-    import sys
+def read_stdin() -> str:
+    """Read user input from stdin.
+
+    Returns:
+        str: The user iput.
+    """
     print("Enter description. Finish by pressing Ctrl+d")
     message = ""
     for line in sys.stdin:
@@ -11,73 +21,146 @@ def readStdin():
 
 
 # Date and duration formatting
-def formatDuration(duration: timedelta):
-    s = duration.total_seconds()
+
+def format_duration(duration: Timedelta) -> str:
+    """Format a duration into a human readable string.
+
+    Args:
+        duration (Timedelta): The duration to be formatted.
+
+    Returns:
+        str: The formatted duration.
+    """
+    sec = duration.total_seconds()
     sign = ""
-    if s < 0:
+    if sec < 0:
         sign = "-"
-        s = -s
+        sec = -sec
 
-    hours = divmod(s, 3600)[0]
-    minutes = divmod(s, 60)[0] - hours * 60
+    hours = divmod(sec, 3600)[0]
+    minutes = divmod(sec, 60)[0] - hours * 60
 
-    return "%s%0.f Hours %0.f Minutes" % (sign, hours, minutes)
+    return f"{sign}{hours:.0f} Hours {minutes:.0f} Minutes"
 
 
-def formatDate(date: date):
+def format_date(date: Date) -> str:
+    """Format a date into a human readable string.
+
+    Args:
+        date (Date): The date to be formatte.
+
+    Returns:
+        str: The formatted date.
+    """
     return date.strftime("%d %B %Y")
 
 
-def formatTime(date: datetime):
-    return date.strftime("%H:%M")
+def format_datetime(datetime: Datetime, time: bool = False) -> str:
+    """Format a datetime into a human readable string.
+
+    Args:
+        datetime (Datetime): The datetime to be formatted.
+        time (bool, optional): If true also prints the time. Defaults to False.
+
+    Returns:
+        str: The formatted datetime.
+    """
+    if time:
+        return datetime.strftime("%H:%M")
+    return datetime.strftime("%d %B %Y %H:%M")
 
 
-def formatDatetime(date: datetime):
-    return date.strftime("%d %B %Y %H:%M")
+def datetime_from_string(string: str) -> Datetime:
+    """Parse a string into a datetime object.
+
+    Args:
+        string (str): The string to be parsed.
+
+    Returns:
+        Datetime: The datetime object.
+    """
+    return Datetime.strptime(string, "%d %B %Y %H:%M")
 
 
-def datetimeFromString(string: str):
-    return datetime.strptime(string, "%d %B %Y %H:%M")
+def get_week(date: Date) -> (Date, Date):
+    """Get the start and end of the week for a particular date.
 
+    Args:
+        date (Date): The reference date.
 
-def getWeek(inputDate: date):
-    start = inputDate - timedelta(days=inputDate.weekday())
-    end = start + timedelta(days=6)
+    Returns:
+        (Date, Date): A tuple of dates containing (start,end) dates of the week.
+    """
+    start = date - Timedelta(days=date.weekday())
+    end = start + Timedelta(days=6)
     return start, end
 
 
-def getMonth(inputDate: date):
-    start = inputDate - timedelta(days=inputDate.day-1)
-    nextMonth = inputDate.replace(day=28) + timedelta(days=4)
-    end = nextMonth - timedelta(days=nextMonth.day)
+def get_month(date: Date) -> (Date, Date):
+    """Get the start and end of the month for a particular date.
+
+    Args:
+        date (Date): The reference date.
+
+    Returns:
+        (Date, Date): A tuple of dates containing (start,end) dates of the month.
+    """
+    start = date - Timedelta(days=date.day-1)
+    # make sure we're in the next month
+    next_month = date.replace(day=28) + Timedelta(days=4)
+    end = next_month - Timedelta(days=next_month.day)
     return start, end
 
 
-def parseDate(dateStr: str):
-    if type(dateStr) != str:
+def parse_date(string: str) -> (Datetime, str):
+    """Parses a string into a datetime object.
+
+    Also returns which type of format the string was in.
+
+    Args:
+        string (str): The string to be parsed.
+
+    Raises:
+        ValueError: When the string could not be parsed.
+
+    Returns:
+        (Datetime, str): The parsed datetime, along with the type.
+    """
+    if not isinstance(string, str):
         raise ValueError
     try:
-        return datetime.strptime(dateStr, '%Y').date(), "year"
+        return Datetime.strptime(string, '%Y').date(), "year"
     except ValueError:
         pass
 
     try:
-        return datetime.strptime(dateStr, '%B %Y').date(), "month"
+        return Datetime.strptime(string, '%B %Y').date(), "month"
     except ValueError:
         pass
     try:
-        return datetime.strptime(dateStr, '%d %B %Y').date(), "day"
+        return Datetime.strptime(string, '%d %B %Y').date(), "day"
     except ValueError:
         pass
     try:
-        return datetime.strptime(dateStr, '%d %B %Y %H:%M').date(), "slot"
+        return Datetime.strptime(string, '%d %B %Y %H:%M').date(), "slot"
     except ValueError:
         pass
 
     raise ValueError
 
 
-def hasKeywords(slot, keywords):
+def has_keywords(slot: dict, keywords: list) -> bool:
+    """Check if the description of a slot contains the requested keywords.
+
+    Args:
+        slot (dict): The slot.
+        keywords (list): The keywords
+
+    Returns:
+        bool: True if description contains the keywords, false otherwise.
+    """
+    if not keywords:
+        return True
     # Filter for relevant keywords
     relevant = True
     for keyword in keywords:

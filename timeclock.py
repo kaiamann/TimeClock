@@ -4,7 +4,7 @@ import os
 import csv
 import holidays
 from storage import Storage
-from utils import formatTime, formatDate, formatDuration, readStdin, hasKeywords, datetimeFromString
+from utils import format_datetime, format_date, format_duration, read_stdin, has_keywords, datetime_from_string
 
 # TODO: store the config file in the correct canonical location
 CONFIG_PATH = os.path.join(os.path.abspath(
@@ -53,10 +53,10 @@ class TimeClock:
         now = datetime.now()
         if now.date() in self.holidays:
             now = self.__findNextWorkday(now)
-            print("Today is a free day moving to " + formatDate(now.date()))
+            print("Today is a free day moving to " + format_date(now.date()))
 
         if self.isStarted():
-            description = readStdin()
+            description = read_stdin()
             self.finish(now, description)
         else:
             self.start(now)
@@ -69,9 +69,9 @@ class TimeClock:
         Args:
             start (datetime): The point in time where tracking should begin.
         """
-        self.storage.createSlot(start)
-        formattedDate = formatDate(start.date())
-        time = formatTime(start)
+        self.storage.create_slot(start)
+        formattedDate = format_date(start.date())
+        time = format_datetime(start, True)
         print("%s: Starting at %s." % (formattedDate, time))
 
     def finish(self, end: datetime, description: str) -> None:
@@ -81,10 +81,10 @@ class TimeClock:
             end (datetime): The point in time where tracking should stop.
             description (str): The description of what has been done.
         """
-        start = self.storage.getLastSlot()['start']
-        self.storage.editSlot(start, start, end, description)
+        start = self.storage.get_last_slot()['start']
+        self.storage.edit_slot(start, start, end, description)
 
-        formattedDate = formatDate(end)
+        formattedDate = format_date(end)
         time = end.strftime("%H:%M")
 
         print("%s: Ending at %s. Worked for: %s" %
@@ -96,7 +96,7 @@ class TimeClock:
         Returns:
             bool: True if there is an open slot False otherwise.
         """
-        lastSlot = self.storage.getLastSlot()
+        lastSlot = self.storage.get_last_slot()
         return lastSlot and 'end' not in lastSlot
 
     # -------------
@@ -115,8 +115,8 @@ class TimeClock:
             timedelta: The amount of time worked.
         """
         duration = timedelta()
-        for slot in self.storage.getSlotsBetween(start, end, keywords):
-            if not hasKeywords(slot, keywords):
+        for slot in self.storage.get_slots_between(start, end, keywords):
+            if not has_keywords(slot, keywords):
                 continue
             duration += slot['end'] - slot['start']
 
@@ -182,10 +182,10 @@ class TimeClock:
         res = []
 
         for slot in self.data:
-            if not hasKeywords(slot, keywords):
+            if not has_keywords(slot, keywords):
                 continue
 
-            startDatetime = datetimeFromString(slot["start"])
+            startDatetime = datetime_from_string(slot["start"])
 
             refVal = None
             checkVal = None
@@ -226,14 +226,14 @@ class TimeClock:
 
     def _getExportData(self, start: datetime, end: datetime) -> list:
         csvData = []
-        for slot in self.storage.getSlotsBetween(start, end):
+        for slot in self.storage.get_slots_between(start, end):
             start = slot["start"]
             end = slot["end"]
             slotDict = {
                 "day": start.strftime("%d.%m.%Y"),
                 "start": start.strftime("%H:%M"),
                 "end": end.strftime("%H:%M"),
-                "duration": formatDuration(end - start),
+                "duration": format_duration(end - start),
                 "description": slot['description'] if "description" in slot else ""
             }
             csvData.append(slotDict)
