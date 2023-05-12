@@ -11,15 +11,15 @@ import holidays
 import yaml
 import pycountry
 import inquirer
-import pyfiglet
-import versioncontrol
+from pyfiglet import Figlet
 from timeclock import TimeClock
 from storage import JSONStorage
 from utils import parse_date, get_week, get_month, format_date, format_duration
 
-# TODO: store the config file in the correct canonical location
-CONFIG_PATH = os.path.join(os.path.abspath(
-    os.path.dirname(__file__)), "config.yml")
+CONFIG_PATH = os.path.join(
+    os.path.expanduser('~'),
+    ".timeclock.yml"
+)
 EDITOR = os.environ.get('EDITOR', 'code')
 
 
@@ -30,7 +30,6 @@ class CLI:
     """
     # TODO: pull params out of the dict into constructor signature
     def __init__(self, config: dict) -> None:
-        self.version_control = versioncontrol.VersionControl()
 
         # load config and crecreate objects
         data_dir = config['data_dir']
@@ -69,6 +68,7 @@ class CLI:
         """
         self.time_clock.track()
 
+    # TODO: move this back into TimeClock and return an array containing the results
     def summary(self, args: dict) -> None:
         """Routine to print a summary for the chosen period.
 
@@ -76,7 +76,6 @@ class CLI:
             args (dict): The arguments from the argparser
         """
         args = vars(self.argparser.parse_args())
-        print(args)
 
         # handle date
         input_date = Date.today()
@@ -169,8 +168,11 @@ class CLI:
         pass
 
 
-def init(args: dict=None) -> None:
-    """Initializes the TimeClock
+def install(args: dict=None) -> None:
+    pass
+
+def configure(args: dict=None) -> None:
+    """Configures the TimeClock
 
     Asks the user for important configuration parameters:
 
@@ -183,9 +185,9 @@ def init(args: dict=None) -> None:
     Args:
         args (dirct): The arguments from the argparser.
     """
-    # print header if init is called for the first time
+    # print header if config is called for the first time
     if not args:
-        print(pyfiglet.Figlet(font="big").renderText("TimeClock"))
+        print(Figlet(font="big").renderText("TimeClock"))
 
     locales = holidays.list_supported_countries()
     # filter out all the country codes that don't exist in pycountry
@@ -346,11 +348,11 @@ def initialize_parser(cli: CLI):
     edit_parser.set_defaults(func=cli.edit)
 
     # init
-    init_parser = subparsers.add_parser(
+    config_parser = subparsers.add_parser(
         "init",
-        description="Initialize the TimeClock config."
+        description="Configure the TimeClock."
     )
-    init_parser.set_defaults(func=init)
+    config_parser.set_defaults(func=configure)
 
     # ls
     ls_parser = subparsers.add_parser("ls")
@@ -388,16 +390,17 @@ def run():
 
     except FileNotFoundError as err:
         print(err)
-        print("The CLI is not initialized yet.")
-        if yes_no_question("Do you wish to initialize?"):
-            init({})
+        print("The CLI is not configured yet.")
+        if yes_no_question("Do you wish to configure it?"):
+            configure()
             return
         print("No or invalid config. Aborting")
         return
 
     cli = CLI(config)
 
-    argparser = initialize_parser(cli)
+    argparser = cli.argparser
+
     # cli.set_argparser(argparser)
 
     # read the handler and execute

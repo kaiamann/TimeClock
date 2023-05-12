@@ -6,11 +6,6 @@ import holidays
 from storage import Storage
 from utils import format_datetime, format_date, format_duration, read_stdin, has_keywords, datetime_from_string
 
-# TODO: store the config file in the correct canonical location
-CONFIG_PATH = os.path.join(os.path.abspath(
-    os.path.dirname(__file__)), "config.yml")
-
-
 class TimeClock:
     """A class for tracking working hours."""
 
@@ -164,6 +159,7 @@ class TimeClock:
     # -- Navigation --
     # ----------------
 
+    # TODO: move this to storage
     def ls(self, mode: str | None, date: date, keywords: list = []) -> None:
         """Attempt to provide a navigatable interface though the data.
 
@@ -181,7 +177,7 @@ class TimeClock:
         }
         res = []
 
-        for slot in self.data:
+        for slot in self.storage.data:
             if not has_keywords(slot, keywords):
                 continue
 
