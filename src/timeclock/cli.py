@@ -11,6 +11,7 @@ import holidays
 import yaml
 import pycountry
 import inquirer
+import argcomplete
 from pyfiglet import Figlet
 from .timeclock import TimeClock
 from .storage import JSONStorage
@@ -101,8 +102,8 @@ class CLI:
             keywords = re.split(' ', args['keywords'])
 
         duration = self.time_clock.summary(start, end, keywords)
-        tbd = self.time_clock.toBeDone(start, end)
-        recent_holidays = self.time_clock.holidaysBetween(start, end)
+        tbd = self.time_clock.to_be_done(start, end)
+        recent_holidays = self.time_clock.holidays_between(start, end)
 
         if duration > tbd:
             pass
@@ -129,7 +130,7 @@ class CLI:
         """
         args = vars(self.argparser.parse_args())
 
-        if not self.time_clock.isStarted():
+        if not self.time_clock.is_started():
             month = Datetime.strptime(
                 args['month'], "%B %Y") if args['month'] else Datetime.now()
             self.time_clock.exportMonth(month)
@@ -404,7 +405,7 @@ def run():
 
     argparser = cli.argparser
 
-    # cli.set_argparser(argparser)
+    argcomplete.autocomplete(argparser)
 
     # read the handler and execute
     args = argparser.parse_args()

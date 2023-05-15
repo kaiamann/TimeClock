@@ -10,3 +10,4 @@ PyYAML==6.0
 readchar==4.0.5
 six==1.16.0
 wcwidth==0.2.6
+argcomplete==3.0.8

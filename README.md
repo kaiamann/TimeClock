@@ -88,3 +88,13 @@ You can use them to keep track of how much time you spent on a particular projec
 timeclock summary -k "SomeKeyword"
 ```
 This will only count sessions where these particular keywords occurs in the description.
+
+## Version Control
+Coming soon:tm:
+
+## Fancy stuff
+If you want to enable tab completion for the timeclock, add this line to your `.bashrc`:
+```
+eval "$(register-python-argcomplete timeclock)"
+```
+Currently this only supports the subparsers and their flag options.
