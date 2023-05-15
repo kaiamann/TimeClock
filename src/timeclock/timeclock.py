@@ -3,8 +3,8 @@ from datetime import datetime, date, timedelta
 import os
 import csv
 import holidays
-from storage import Storage
-from utils import format_datetime, format_date, format_duration, read_stdin, has_keywords, datetime_from_string
+from .storage import Storage
+from .utils import format_datetime, format_date, format_duration, read_stdin, has_keywords, datetime_from_string
 
 class TimeClock:
     """A class for tracking working hours."""

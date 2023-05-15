@@ -12,9 +12,9 @@ import yaml
 import pycountry
 import inquirer
 from pyfiglet import Figlet
-from timeclock import TimeClock
-from storage import JSONStorage
-from utils import parse_date, get_week, get_month, format_date, format_duration
+from .timeclock import TimeClock
+from .storage import JSONStorage
+from .utils import parse_date, get_week, get_month, format_date, format_duration
 
 CONFIG_PATH = os.path.join(
     os.path.expanduser('~'),
@@ -41,7 +41,10 @@ class CLI:
         hours_per_day = config['hours_per_day']
         days_off_per_month = config['days_off_per_month']
         locale = config['locale']
-        subdiv = config['locale_subdiv']
+        subdiv = None
+        if 'locale_subdiv' in config:
+            subdiv = config['locale_subdiv']
+        
         self.time_clock = TimeClock(
             self.storage,
             hours_per_day,
@@ -349,7 +352,7 @@ def initialize_parser(cli: CLI):
 
     # init
     config_parser = subparsers.add_parser(
-        "init",
+        "config",
         description="Configure the TimeClock."
     )
     config_parser.set_defaults(func=configure)

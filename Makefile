@@ -18,3 +18,4 @@ clean:
 	rm -rf build
 	rm -rf __pycache__
 	rm -f cli.spec
+	rm -rf src/timeclock.egg-info

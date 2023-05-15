@@ -8,8 +8,7 @@ import os
 from abc import ABC, abstractmethod
 from datetime import date, datetime
 from subprocess import call
-from typing_extensions import override
-from utils import datetime_from_string, format_datetime, has_keywords
+from .utils import datetime_from_string, format_datetime, has_keywords
 
 EDITOR = os.environ.get('EDITOR', 'code')
 
@@ -124,7 +123,6 @@ class Storage(ABC):
 class JSONStorage(Storage):
     """A Storage implementation that a JSON file."""
 
-    @override
     def __init__(self, dataDir: str, fileName: str) -> None:
         self.data_dir = dataDir
         self.filename = fileName
@@ -142,14 +140,12 @@ class JSONStorage(Storage):
             message = f"{self.data_path} is not a valid JSON file."
             raise InvalidStorageException(message) from err
 
-    @override
     def load(self) -> bool:
         with open(self.data_path, "r", encoding="utf-8") as file:
             self.data = json.load(file)
             return True
         return False
 
-    @override
     def save(self, mode="w+") -> bool:
         try:
             with open(self.data_path, mode, encoding="utf-8") as file:
@@ -159,20 +155,17 @@ class JSONStorage(Storage):
             print("Error writing data")
             return False
 
-    @override
     def create_slot(self, start: datetime) -> None:
         formatted_start = format_datetime(start)
         slot = {"start": formatted_start}
         self.data.append(slot)
 
-    @override
     def get_slot(self, start: datetime) -> dict | None:
         for slot in self.data:
             if slot['start'] == start:
                 return slot
         return None
 
-    @override
     def edit_slot(self,
                   old_start: datetime,
                   new_start: datetime,
@@ -188,7 +181,6 @@ class JSONStorage(Storage):
                 return True
         return False
 
-    @override
     def delete_slot(self, start: datetime):
         for slot in self.data:
             slot_start = datetime_from_string(slot['start'])
@@ -197,7 +189,6 @@ class JSONStorage(Storage):
                 return True
         return False
 
-    @override
     def get_last_slot(self):
         if not self.data:
             return None
@@ -214,7 +205,6 @@ class JSONStorage(Storage):
 
         return parsed_slot
 
-    @override
     def get_slots_between(self,
                           start: datetime,
                           end: datetime,
@@ -240,7 +230,6 @@ class JSONStorage(Storage):
                 slots.append(parsed_slot)
         return slots
 
-    @override
     def edit(self, editor: str):
         editor = editor if editor else EDITOR
         call([editor, self.data_path])
