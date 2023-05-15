@@ -1,4 +1,4 @@
-"""A module containing various heler methods"""
+"""A module containing various helper methods"""
 import sys
 from datetime import (
     timedelta as Timedelta,
