@@ -1,14 +1,16 @@
 """Does Stuff."""
-from datetime import(
-    datetime as Datetime,
-    date as Date,
-    timedelta as Timedelta
-)
-import os
 import csv
+import os
+from datetime import date as Date
+from datetime import datetime as Datetime
+from datetime import timedelta as Timedelta
+
 import holidays
+
 from .storage import Storage
-from .utils import format_datetime, format_date, format_duration, read_stdin, has_keywords, datetime_from_string
+from .utils import (datetime_from_string, format_date, format_datetime,
+                    format_duration, get_month, has_keywords, read_lines)
+
 
 class TimeClock:
     """A class for tracking working hours."""
@@ -55,7 +57,8 @@ class TimeClock:
             print("Today is a free day moving to " + format_date(now.date()))
 
         if self.is_started():
-            description = read_stdin()
+            print("Enter description. Finish by pressing Ctrl+d")
+            description = read_lines()
             self.finish(now, description)
         else:
             self.start(now)
@@ -226,38 +229,38 @@ class TimeClock:
     # -- Export --
     # ------------
 
-    def _getExportData(self, start: Datetime, end: Datetime) -> list:
-        csvData = []
-        for slot in self.storage.get_slots_between(start, end):
+    def export(self, filename: str, start: Date, end: Date, keywords:list = None) -> None:
+        """Export data into a csv file.
+
+        Args:
+            start (Date): The start of the timeframe.
+            end (Date): The end of the timeframe.
+            keywords (list, optional): Keywords that have to be 
+            contained in the slots descriptions to be counted. Defaults to [].
+        """
+        if not keywords:
+            keywords = []
+
+        csv_data = []
+        for slot in self.storage.get_slots_between(start, end, keywords):
             start = slot["start"]
             end = slot["end"]
-            slotDict = {
+            slot_dict = {
                 "day": start.strftime("%d.%m.%Y"),
                 "start": start.strftime("%H:%M"),
                 "end": end.strftime("%H:%M"),
                 "duration": format_duration(end - start),
                 "description": slot['description'] if "description" in slot else ""
             }
-            csvData.append(slotDict)
-        return csvData
+            csv_data.append(slot_dict)
 
-    def exportMonth(self, datetime: Datetime = Datetime.now()) -> None:
-        """Attempt to export some data into a csv file.
+        path = os.path.join(self.storage.data_dir, f"{filename}.csv")
 
-        Args:
-            month (Datetime, optional): A reference date. Defaults to Datetime.now().
-        """
-        month = datetime.strftime("%B %Y")
-        path = os.path.join(self.storage, "%s.csv" % month)
-
-        # TODO: fix this
-        data = self._getExportData(datetime)
-
-        with open(path, "w", newline='') as csvfile:
+        with open(path, "w", encoding="utf-8", newline='') as csvfile:
             fieldnames = ['day', 'start', 'end', 'duration', 'description']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
-            for slot in data:
+            for slot in csv_data:
                 writer.writerow(slot)
 
     # -------------

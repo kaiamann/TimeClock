@@ -7,16 +7,15 @@ from datetime import (
 )
 
 
-def read_stdin() -> str:
+def read_lines() -> str:
     """Read user input from stdin.
 
     Returns:
         str: The user iput.
     """
-    print("Enter description. Finish by pressing Ctrl+d")
     message = ""
     for line in sys.stdin:
-        message += line
+        message.join(line)
     return message
 
 

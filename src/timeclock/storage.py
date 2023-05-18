@@ -8,6 +8,7 @@ import os
 from abc import ABC, abstractmethod
 from datetime import date, datetime
 from subprocess import call
+
 from .utils import datetime_from_string, format_datetime, has_keywords
 
 EDITOR = os.environ.get('EDITOR', 'code')
@@ -231,5 +232,4 @@ class JSONStorage(Storage):
         return slots
 
     def edit(self, editor: str):
-        editor = editor if editor else EDITOR
         call([editor, self.data_path])

@@ -3,26 +3,26 @@
 import argparse
 import os
 import re
-from datetime import(
-    datetime as Datetime,
-    date as Date
-)
-import holidays
-import yaml
-import pycountry
-import inquirer
+from datetime import date as Date
+from datetime import datetime as Datetime
+
 import argcomplete
+import holidays
+import inquirer
+import pycountry
+import yaml
 from pyfiglet import Figlet
-from .timeclock import TimeClock
+
 from .storage import JSONStorage
-from .utils import parse_date, get_week, get_month, format_date, format_duration
+from .timeclock import TimeClock
+from .utils import (format_date, format_duration, get_month, get_week,
+                    parse_date)
 
 CONFIG_PATH = os.path.join(
     os.path.expanduser('~'),
     ".timeclock.yml"
 )
 EDITOR = os.environ.get('EDITOR', 'code')
-
 
 class CLI:
     """A Command Line Interface that allows the user to track working hours.
@@ -45,7 +45,7 @@ class CLI:
         subdiv = None
         if 'locale_subdiv' in config:
             subdiv = config['locale_subdiv']
-        
+
         self.time_clock = TimeClock(
             self.storage,
             hours_per_day,
@@ -56,12 +56,14 @@ class CLI:
 
     # Command line handlers
 
-    def edit(self, editor: str=EDITOR)-> None:
+    def edit(self, args: dict)-> None:
         """Edit the storage directly with the chosen editor.
 
         Args:
             editor (str): The editor.
         """
+        args = vars(self.argparser.parse_args())
+        editor = args['editor']
         self.storage.edit(editor)
 
     def track(self, args: dict) -> None:
@@ -130,13 +132,35 @@ class CLI:
         """
         args = vars(self.argparser.parse_args())
 
-        if not self.time_clock.is_started():
-            month = Datetime.strptime(
-                args['month'], "%B %Y") if args['month'] else Datetime.now()
-            self.time_clock.exportMonth(month)
-        else:
-            print("""Please finish the current work
+        if self.time_clock.is_started():
+            print("""Please finish the current work\
             session before trying to export.""")
+            return
+
+        # handle date
+        input_date = Date.today()
+        if args['date']:
+            input_date = Datetime.strptime(args['date'], '%d %B %Y').date()
+
+        # default to day mode
+        start = input_date
+        end = input_date
+        filename = format_date(input_date)
+
+        # set start end end for multi day modes
+        if args['week']:
+            start, end = get_week(input_date)
+            filename = f"Week {start.isocalendar().week} {start.year}"
+        if args['month']:
+            start, end = get_month(input_date)
+            filename = f"{Datetime.strftime(start,'%B %Y')}"
+
+        # handle keywords
+        keywords = []
+        if args['keywords']:
+            keywords = re.split(' ', args['keywords'])
+
+        self.time_clock.export(filename, start, end, keywords)
 
     def ls(self, args: dict) -> None:
         """Routine to navigate the data in a directory-like structure
@@ -170,10 +194,6 @@ class CLI:
 
     def push(self, args: dict) -> None:
         pass
-
-
-def install(args: dict=None) -> None:
-    pass
 
 def configure(args: dict=None) -> None:
     """Configures the TimeClock
@@ -296,7 +316,6 @@ def initialize_parser(cli: CLI):
         description='A time clock for keeping track of working hours.',
         epilog='Calling without arguments will start the tracking process.'
     )
-
     argparser.set_defaults(func=cli.track)
 
     subparsers = argparser.add_subparsers(
@@ -335,11 +354,32 @@ def initialize_parser(cli: CLI):
     # export
     export_parser = subparsers.add_parser("export")
     export_parser.add_argument(
+        '-w',
+        '--week',
+        action="store_true",
+        help="""Export the current week.
+        Also works with -d flag for querying another week"""
+    )
+    export_parser.add_argument(
         '-m',
         '--month',
-        help="""Exports a specific month to CSV.
-        The month has to be in "%B %Y" format.
-        E.g. 'December 2022'""")
+        action="store_true",
+        help="""Export the current month.
+        Also works with -d flag for querying another month"""
+    )
+    export_parser.add_argument(
+        '-d',
+        '--date',
+        help="""Export a particular date.
+        DATE has to be in d.MMMM.yyyy format. e.g. "11 November 2023".
+        Defaults to the current day."""
+    )
+    export_parser.add_argument(
+        '-k',
+        '--keywords',
+        help='Adds a filter for the specified keywords'
+    )
+    export_parser.set_defaults(func=cli.export)
 
     # edit
     edit_parser = subparsers.add_parser("edit")
@@ -347,7 +387,8 @@ def initialize_parser(cli: CLI):
         '-e',
         '--editor',
         help="""Edit the JSON file storing the timeslots
-        using the specefied editor"""
+        using the specified editor""",
+        default=EDITOR
     )
     edit_parser.set_defaults(func=cli.edit)
 
