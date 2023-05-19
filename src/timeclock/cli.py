@@ -81,6 +81,7 @@ class CLI:
         Args:
             args (dict): The arguments from the argparser.
         """
+        del args
         if self.version_control and self.version_control.is_behind():
             self.version_control.pull()
 
@@ -97,7 +98,6 @@ class CLI:
             self.timeclock.start(now)
 
         self.storage.save()
-
 
 
     # TODO: move this back into TimeClock and return an array containing the results
@@ -221,6 +221,7 @@ class CLI:
         Args:
             args (dict): Args from the argparser
         """
+        del args
         if self.version_control.is_behind():
             print("The repository seems to be behind the origin. Try pulling first")
         self.version_control.commit()
@@ -231,10 +232,12 @@ class CLI:
         Args:
             args (dict): Args from the argparser
         """
+        del args
         self.version_control.push()
-    
+
     def pull(self, args: dict) -> None:
         """Pull from the remote."""
+        del args
         self.version_control.pull()
 
 def configure(args: dict=None) -> None:
