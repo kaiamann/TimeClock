@@ -12,11 +12,13 @@ import inquirer
 import pycountry
 import yaml
 from pyfiglet import Figlet
+from git import InvalidGitRepositoryError
 
 from .storage import JSONStorage
 from .timeclock import TimeClock
+from .versioncontrol import VersionControl
 from .utils import (format_date, format_duration, get_month, get_week,
-                    parse_date)
+                    parse_date, read_lines)
 
 CONFIG_PATH = os.path.join(
     os.path.expanduser('~'),
@@ -36,6 +38,12 @@ class CLI:
         data_dir = config['data_dir']
         filename = config['file_name']
         self.storage = JSONStorage(data_dir, filename)
+        try:
+            self.version_control = VersionControl(data_dir)
+        except InvalidGitRepositoryError as error:
+            self.version_control = None
+            print(error)
+            print("Git functionality disabled.")
 
         self.argparser=initialize_parser(self)
 
@@ -46,7 +54,7 @@ class CLI:
         if 'locale_subdiv' in config:
             subdiv = config['locale_subdiv']
 
-        self.time_clock = TimeClock(
+        self.timeclock = TimeClock(
             self.storage,
             hours_per_day,
             days_off_per_month,
@@ -66,13 +74,31 @@ class CLI:
         editor = args['editor']
         self.storage.edit(editor)
 
+
     def track(self, args: dict) -> None:
         """Routine to start or stop the time tracking.
 
         Args:
             args (dict): The arguments from the argparser.
         """
-        self.time_clock.track()
+        if self.version_control and self.version_control.is_behind():
+            self.version_control.pull()
+
+        now = Datetime.now()
+        if now.date() in self.timeclock.holidays:
+            now = self.timeclock.next_workday(now)
+            print("Today is a free day moving to " + format_date(now.date()))
+
+        if self.timeclock.is_started():
+            print("Enter description. Finish by pressing Ctrl+d")
+            description = read_lines()
+            self.timeclock.finish(now, description)
+        else:
+            self.timeclock.start(now)
+
+        self.storage.save()
+
+
 
     # TODO: move this back into TimeClock and return an array containing the results
     def summary(self, args: dict) -> None:
@@ -103,9 +129,9 @@ class CLI:
         if args['keywords']:
             keywords = re.split(' ', args['keywords'])
 
-        duration = self.time_clock.summary(start, end, keywords)
-        tbd = self.time_clock.to_be_done(start, end)
-        recent_holidays = self.time_clock.holidays_between(start, end)
+        duration = self.timeclock.summary(start, end, keywords)
+        tbd = self.timeclock.to_be_done(start, end)
+        recent_holidays = self.timeclock.holidays_between(start, end)
 
         if duration > tbd:
             pass
@@ -132,7 +158,7 @@ class CLI:
         """
         args = vars(self.argparser.parse_args())
 
-        if self.time_clock.is_started():
+        if self.timeclock.is_started():
             print("""Please finish the current work\
             session before trying to export.""")
             return
@@ -160,7 +186,7 @@ class CLI:
         if args['keywords']:
             keywords = re.split(' ', args['keywords'])
 
-        self.time_clock.export(filename, start, end, keywords)
+        self.timeclock.export(filename, start, end, keywords)
 
     def ls(self, args: dict) -> None:
         """Routine to navigate the data in a directory-like structure
@@ -185,15 +211,31 @@ class CLI:
         if args['keywords']:
             keywords = re.split(' ', args['keywords'])
 
-        res = self.time_clock.ls(mode, date, keywords)
+        res = self.timeclock.ls(mode, date, keywords)
         print(res)
         return res
 
     def commit(self, args: dict) -> None:
-        pass
+        """Commit the changes.
+
+        Args:
+            args (dict): Args from the argparser
+        """
+        if self.version_control.is_behind():
+            print("The repository seems to be behind the origin. Try pulling first")
+        self.version_control.commit()
 
     def push(self, args: dict) -> None:
-        pass
+        """Push the changes.
+
+        Args:
+            args (dict): Args from the argparser
+        """
+        self.version_control.push()
+    
+    def pull(self, args: dict) -> None:
+        """Pull from the remote."""
+        self.version_control.pull()
 
 def configure(args: dict=None) -> None:
     """Configures the TimeClock
@@ -423,6 +465,10 @@ def initialize_parser(cli: CLI):
     # push
     push_parser = subparsers.add_parser("push")
     push_parser.set_defaults(func=cli.push)
+
+    # pull
+    pull_parser = subparsers.add_parser("pull")
+    pull_parser.set_defaults(func=cli.pull)
 
     return argparser
 

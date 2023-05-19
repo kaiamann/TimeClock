@@ -45,26 +45,6 @@ class TimeClock:
     # -- Time Tracking --
     # -------------------
 
-    def track(self) -> None:
-        """Track working hours.
-
-        Starts tracking time if no slot is open.
-        Closes the current open slot otherwise.
-        """
-        now = Datetime.now()
-        if now.date() in self.holidays:
-            now = self._next_workday(now)
-            print("Today is a free day moving to " + format_date(now.date()))
-
-        if self.is_started():
-            print("Enter description. Finish by pressing Ctrl+d")
-            description = read_lines()
-            self.finish(now, description)
-        else:
-            self.start(now)
-
-        self.storage.save()
-
     def start(self, start: Datetime) -> None:
         """Start the time tracking.
 
@@ -267,7 +247,7 @@ class TimeClock:
     # -- Helpers --
     # -------------
 
-    def _next_workday(self, datetime: Datetime):
+    def next_workday(self, datetime: Datetime):
         while (datetime.weekday() in [5, 6]) or (datetime.date() in self.holidays):
             datetime += Timedelta(days=1)
         return datetime

@@ -6,7 +6,6 @@ from datetime import (
     date as Date,
 )
 
-
 def read_lines() -> str:
     """Read user input from stdin.
 
@@ -81,7 +80,7 @@ def datetime_from_string(string: str) -> Datetime:
     return Datetime.strptime(string, "%d %B %Y %H:%M")
 
 
-def get_week(date: Date) -> (Date, Date):
+def get_week(date: Date) -> tuple[Date, Date]:
     """Get the start and end of the week for a particular date.
 
     Args:
@@ -95,7 +94,7 @@ def get_week(date: Date) -> (Date, Date):
     return start, end
 
 
-def get_month(date: Date) -> (Date, Date):
+def get_month(date: Date) -> tuple[Date, Date]:
     """Get the start and end of the month for a particular date.
 
     Args:
@@ -111,7 +110,7 @@ def get_month(date: Date) -> (Date, Date):
     return start, end
 
 
-def parse_date(string: str) -> (Datetime, str):
+def parse_date(string: str) -> tuple[Datetime, str]:
     """Parses a string into a datetime object.
 
     Also returns which type of format the string was in.
@@ -131,7 +130,6 @@ def parse_date(string: str) -> (Datetime, str):
         return Datetime.strptime(string, '%Y').date(), "year"
     except ValueError:
         pass
-
     try:
         return Datetime.strptime(string, '%B %Y').date(), "month"
     except ValueError:

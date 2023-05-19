@@ -1,67 +1,52 @@
-import git
+"""Module taking care of version control"""
+from git import Repo, InvalidGitRepositoryError
 
 class VersionControl:
+    """Class taking care of version control"""
 
-    def __init__(self) -> None:
-        # self.repo = git.Repo("path")
-        pass
-    
-    def commit(self):
-        pass
+    def __init__(self, data_dir: str) -> None:
+        self.repo = Repo(data_dir)
+        if not self.repo.remotes:
+            raise InvalidGitRepositoryError(f"""The git repository at \
+            {data_dir} does not seem to have a remote.""")
 
-    def push(self):
-        pass
-
-    def pull(self):
-        pass
-
-    def fetch():
-        pass
-
-    def test(self):
-        print("test")
-
-
-def isBehind(repo: git.Repo):
-    # see if we're behind the remote
-    commits_behind = repo.iter_commits('main..origin/main')
-    return sum(1 for _ in commits_behind) > 0
-
-def getGitRepoWithRemote(path: str):
-    remote = None
-    try:
-        repo = git.Repo(path)
-    except git.InvalidGitRepositoryError:
-        print("%s is not a git repository. Git functionality not available." % (path))
-        return repo
-
-    # also check if there is a remote
-    if not repo.remotes:
-        print("The git repository at %s does not seem to have a remote. Git functionality not available." % (path))
-        return repo
-
-    remote = repo.remotes[0]
-    # fetch from remote
-    remote.fetch()
-
-    return repo
-
+        # take the first remote
+        # TODO: see if this is right
+        remote = self.repo.remotes[0]
+        # fetch from remote
+        remote.fetch()
 
     def commit(self):
+        """Commit changes to the data repo"""
         # get changed files
-        changedFiles = list(item.a_path for item in self.repo.index.diff(None))
-        if len(changedFiles) < 1:
+        changed_files = list(item.a_path for item in self.repo.index.diff(None))
+        if len(changed_files) < 1:
             print("Nothing to commit. Aborting")
             return
 
-        if isBehind(self.repo):
-            print("Your repo seems to be behind the remote. Please pull first.")
-
         # add modified files
-        self.repo.index.add(changedFiles)
+        self.repo.index.add(changed_files)
         # and commit
-        self.repo.index.commit("Added working hours for %s" % (formatDate(date.today())))
+        self.repo.index.commit("Updated working hours")
         print(self.repo.head.commit.message)
 
     def push(self):
+        """Push to remote."""
         self.repo.git.push()
+
+    def pull(self):
+        """Pull from remote."""
+        self.repo.git.pull()
+
+    def fetch(self):
+        """Fetch latest version from remote."""
+
+    def is_behind(self):
+        """Check if the repo is behind the origin.
+
+        Returns:
+            bool: True if repo is behind, false otherwise.
+        """
+        # see if we're behind the remote
+        commits_behind = self.repo.iter_commits('main..origin/main')
+        return sum(1 for _ in commits_behind) > 0
