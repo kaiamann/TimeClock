@@ -12,10 +12,11 @@ def read_lines() -> str:
     Returns:
         str: The user iput.
     """
-    message = ""
+    lines = []
     for line in sys.stdin:
-        message.join(line)
-    return message
+        lines.append(line.strip())
+
+    return "\n".join(lines)
 
 
 # Date and duration formatting
