@@ -9,7 +9,7 @@ import holidays
 
 from .storage import Storage
 from .utils import (datetime_from_string, format_date, format_datetime,
-                    format_duration, get_month, has_keywords, read_lines)
+                    format_duration, has_keywords)
 
 
 class TimeClock:
@@ -52,24 +52,21 @@ class TimeClock:
             start (Datetime): The point in time where tracking should begin.
         """
         self.storage.create_slot(start)
-        formatted_date = format_date(start.date())
-        time = format_datetime(start, True)
-        print(f"{formatted_date}: Starting at {time}.")
 
-    def finish(self, end: Datetime, description: str) -> None:
+    def finish(self, end: Datetime, description: str) -> Datetime:
         """Finish the time tracking.
 
         Args:
             end (Datetime): The point in time where tracking should stop.
             description (str): The description of what has been done.
+        
+        Returns:
+            Datetime: The start Datetime when the slot was started.
         """
         start = self.storage.get_last_slot()['start']
         self.storage.edit_slot(start, start, end, description)
+        return start
 
-        formatted_date = format_date(end)
-        time = end.strftime("%H:%M")
-
-        print(f"{formatted_date}: Ending at {time}. Worked for: {end-start}")
 
     def is_started(self) -> bool:
         """Check if there is an open slot that needs to be closed.
@@ -247,7 +244,16 @@ class TimeClock:
     # -- Helpers --
     # -------------
 
-    def next_workday(self, datetime: Datetime):
+    def next_workday(self, datetime: Datetime) -> Datetime:
+        """Find the next free workday.
+
+        Args:
+            datetime (Datetime): The date from which shoul be searched.
+
+        Returns:
+            Datetime: The next free workday.
+        """
+        # take the next day as long as the current day is a holiday or weekend 
         while (datetime.weekday() in [5, 6]) or (datetime.date() in self.holidays):
             datetime += Timedelta(days=1)
         return datetime

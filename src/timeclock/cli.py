@@ -17,7 +17,7 @@ from git import InvalidGitRepositoryError
 from .storage import JSONStorage
 from .timeclock import TimeClock
 from .versioncontrol import VersionControl
-from .utils import (format_date, format_duration, get_month, get_week,
+from .utils import (format_date, format_datetime, format_duration, get_month, get_week,
                     parse_date, read_lines)
 
 CONFIG_PATH = os.path.join(
@@ -93,11 +93,23 @@ class CLI:
         if self.timeclock.is_started():
             print("Enter description. Finish by pressing Ctrl+d")
             description = read_lines()
-            self.timeclock.finish(now, description)
+            start = self.timeclock.finish(now, description)
+
+            formatted_date = format_date(now)
+            time = now.strftime("%H:%M")
+            print(f"{formatted_date}: Ending at {time}. Worked for: {format_duration(now-start)}")
         else:
             self.timeclock.start(now)
 
-        self.storage.save()
+            formatted_date = format_date(now.date())
+            time = format_datetime(now, True)
+            print(f"{formatted_date}: Starting at {time}.")
+
+        try:
+            self.storage.save()
+        except FileNotFoundError as error:
+            print(error)
+            return False
 
 
     # TODO: move this back into TimeClock and return an array containing the results
@@ -298,7 +310,7 @@ def configure(args: dict=None) -> None:
     if not config:
         return
 
-    # get the country code from the human readable name
+    # get the country code from the human readable nam/
     country = pycountry.countries.get(name=config['locale'])
     country_code = country.alpha_2
     # save the code instead of the name

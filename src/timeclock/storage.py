@@ -145,16 +145,11 @@ class JSONStorage(Storage):
         with open(self.data_path, "r", encoding="utf-8") as file:
             self.data = json.load(file)
             return True
-        return False
 
     def save(self, mode="w+") -> bool:
-        try:
-            with open(self.data_path, mode, encoding="utf-8") as file:
-                json.dump(self.data, file)
-                return True
-        except FileNotFoundError:
-            print("Error writing data")
-            return False
+        with open(self.data_path, mode, encoding="utf-8") as file:
+            json.dump(self.data, file)
+            return True
 
     def create_slot(self, start: datetime) -> None:
         formatted_start = format_datetime(start)
@@ -222,7 +217,7 @@ class JSONStorage(Storage):
             if "end" in slot:
                 slot_end = datetime_from_string(slot["end"])
 
-            if slot_start_date >= start and slot_start_date <= end:
+            if end >= slot_start_date >= start:
                 parsed_slot = {}
                 parsed_slot['start'] = slot_start
                 parsed_slot['end'] = slot_end
