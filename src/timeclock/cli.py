@@ -12,7 +12,7 @@ import inquirer
 import pycountry
 import yaml
 from pyfiglet import Figlet
-from git import InvalidGitRepositoryError
+from git import InvalidGitRepositoryError, GitError
 
 from .storage import JSONStorage
 from .timeclock import TimeClock
@@ -40,10 +40,13 @@ class CLI:
         self.storage = JSONStorage(data_dir, filename)
         try:
             self.version_control = VersionControl(data_dir)
+            self.version_control.fetch()
         except InvalidGitRepositoryError as error:
             self.version_control = None
             print(error)
             print("Git functionality disabled.")
+        except GitError as error:
+            print(error)
 
         self.argparser=initialize_parser(self)
 
@@ -83,7 +86,10 @@ class CLI:
         """
         del args
         if self.version_control and self.version_control.is_behind():
-            self.version_control.pull()
+            try:
+                self.version_control.pull()
+            except:
+                pass
 
         now = Datetime.now()
         if now.date() in self.timeclock.holidays:

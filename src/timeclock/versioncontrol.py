@@ -11,10 +11,9 @@ class VersionControl:
             {data_dir} does not seem to have a remote.""")
 
         # take the first remote
-        # TODO: see if this is right
-        remote = self.repo.remotes[0]
+        # TODO: see if this is the right remote
+        self.remote = self.repo.remotes[0]
         # fetch from remote
-        remote.fetch()
 
     def commit(self):
         """Commit changes to the data repo"""
@@ -40,6 +39,7 @@ class VersionControl:
 
     def fetch(self):
         """Fetch latest version from remote."""
+        self.remote.fetch()
 
     def is_behind(self):
         """Check if the repo is behind the origin.
