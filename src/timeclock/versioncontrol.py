@@ -11,9 +11,7 @@ class VersionControl:
             {data_dir} does not seem to have a remote.""")
 
         # take the first remote
-        # TODO: see if this is the right remote
         self.remote = self.repo.remotes[0]
-        # fetch from remote
 
     def commit(self):
         """Commit changes to the data repo"""

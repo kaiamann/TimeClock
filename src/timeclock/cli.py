@@ -31,7 +31,7 @@ class CLI:
 
     Also provides other functionalities, like exporting and summaries.
     """
-    # TODO: pull params out of the dict into constructor signature
+
     def __init__(self, config: dict) -> None:
 
         # load config and crecreate objects
@@ -88,8 +88,9 @@ class CLI:
         if self.version_control and self.version_control.is_behind():
             try:
                 self.version_control.pull()
-            except:
-                pass
+            except GitError as error:
+                print(error)
+                return False
 
         now = Datetime.now()
         if now.date() in self.timeclock.holidays:
@@ -118,7 +119,6 @@ class CLI:
             return False
 
 
-    # TODO: move this back into TimeClock and return an array containing the results
     def summary(self, args: dict) -> None:
         """Routine to print a summary for the chosen period.
 
@@ -206,7 +206,7 @@ class CLI:
 
         self.timeclock.export(filename, start, end, keywords)
 
-    def ls(self, args: dict) -> None:
+    def list_dir(self, args: dict) -> None:
         """Routine to navigate the data in a directory-like structure
 
         Args:
@@ -332,7 +332,7 @@ def configure(args: dict=None) -> None:
             country_code=country_code))[0].type
 
         # filter the ones that dont have a name...
-        # TODO: some subdivs have a three letter code...
+        # TODO: some subdivs have a three letter code... # pylint: disable=fixme
         # figure out what's up with that
         subdiv_codes = list(filter(lambda x: pycountry.subdivisions.get(
             code=f"{country_code}-{x}"), subdiv_codes))
@@ -474,7 +474,7 @@ def initialize_parser(cli: CLI):
         '--keywords',
         help='Adds a filter for the specified keywords'
     )
-    ls_parser.set_defaults(func=cli.ls)
+    ls_parser.set_defaults(func=cli.list_dir)
 
     # commit
     commit_parser = subparsers.add_parser(
