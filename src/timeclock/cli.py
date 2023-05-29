@@ -90,7 +90,6 @@ class CLI:
                 self.version_control.pull()
             except GitError as error:
                 print(error)
-                return False
 
         now = Datetime.now()
         if now.date() in self.timeclock.holidays:
@@ -116,7 +115,6 @@ class CLI:
             self.storage.save()
         except FileNotFoundError as error:
             print(error)
-            return False
 
 
     def summary(self, args: dict) -> None:
