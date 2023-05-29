@@ -229,7 +229,7 @@ class CLI:
         if args['keywords']:
             keywords = re.split(' ', args['keywords'])
 
-        res = self.timeclock.ls(mode, date, keywords)
+        res = self.timeclock.list_dir(mode, date, keywords)
         print(res)
         return res
 

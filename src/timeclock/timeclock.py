@@ -1,4 +1,4 @@
-"""Does Stuff."""
+"""Module that allows tracking of working hours."""
 import csv
 import os
 from datetime import date as Date
@@ -8,8 +8,7 @@ from datetime import timedelta as Timedelta
 import holidays
 
 from .storage import Storage
-from .utils import (datetime_from_string, format_date, format_datetime,
-                    format_duration, has_keywords)
+from .utils import datetime_from_string, format_duration, has_keywords
 
 
 class TimeClock:
@@ -145,7 +144,7 @@ class TimeClock:
     # -- Navigation --
     # ----------------
 
-    def ls(self, mode: str | None, date: Date, keywords: list = None) -> None:
+    def list_dir(self, mode: str | None, date: Date, keywords: list = None) -> None:
         """Attempt to provide a navigatable interface though the data.
 
         Args:
@@ -253,7 +252,7 @@ class TimeClock:
         Returns:
             Datetime: The next free workday.
         """
-        # take the next day as long as the current day is a holiday or weekend 
+        # take the next day as long as the current day is a holiday or weekend
         while (datetime.weekday() in [5, 6]) or (datetime.date() in self.holidays):
             datetime += Timedelta(days=1)
         return datetime
