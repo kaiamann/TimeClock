@@ -21,7 +21,7 @@ class TestEmptyStorage:
         """Test that the data file exists.
 
         Args:
-            empty_json_storage (Storage): The  Storage.
+            empty_storage (Storage): The  Storage.
         """
         assert os.path.exists(empty_storage.data_path)
 
@@ -29,7 +29,7 @@ class TestEmptyStorage:
         """Test that the storage handles save correctly.
 
         Args:
-            empty_json_storage (Storage): The  Storage.
+            empty_storage (Storage): The  Storage.
         """
         assert empty_storage.save()
 
@@ -37,15 +37,23 @@ class TestEmptyStorage:
         """Test that the storage handles empty load correctly.
 
         Args:
-            empty_json_storage (Storage): The  Storage
+            empty_storage (Storage): The  Storage
         """
         assert empty_storage.load()
+
+    def test_create_slot(self, empty_storage: Storage):
+        """Test insertion of a new slot."""
+        now = Datetime.now().replace(second=0, microsecond=0)
+        empty_storage.create_slot(now)
+        assert len(empty_storage.data) == 1
+        assert empty_storage.get_last_slot()['start'] == now
+        assert empty_storage.get_slot(now)['start'] == now
 
     def test_get_slot(self, empty_storage: Storage):
         """Test that the storage returns None when a non existing slot is requested.
 
         Args:
-            empty_json_storage (Storage): The  Storage.
+            empty_storage (Storage): The  Storage.
         """
         datetime = Datetime.now()
         assert empty_storage.get_slot(datetime) is None
@@ -54,16 +62,15 @@ class TestEmptyStorage:
         """Test that the storage returns False when a non existing slot is deleted.
 
         Args:
-            empty_json_storage (Storage): The  Storage.
+            empty_storage (Storage): The  Storage.
         """
-        datetime = Datetime.now()
-        assert not empty_storage.delete_slot(datetime)
+        assert not empty_storage.delete_slot(Datetime.now())
 
     def test_get_last_slot(self, empty_storage: Storage):
         """Test that the storage returns None when requesting the last slot on empty dataset.
 
         Args:
-            empty_json_storage (Storage): The  Storage.
+            empty_storage (Storage): The  Storage.
         """
         assert empty_storage.get_last_slot() is None
 
@@ -71,7 +78,7 @@ class TestEmptyStorage:
         """Test that the storage returns an empty list requesting multiple slots on empty dataset.
 
         Args:
-            empty_json_storage (Storage): The  Storage.
+            empty_storage (Storage): The  Storage.
         """
         start = Datetime.now()
         end = start + Timedelta(hours=1)
@@ -106,31 +113,35 @@ class TestInitializedStorage:
         """
         assert initialized_storage.load()
 
-    def test_get_slot(self, initialized_storage: Storage):
+
+    def test_get_slot(self, slots, initialized_storage: Storage):
         """Test that the storage returns None when a non existing slot is requested.
 
         Args:
             initialized_storage (Storage): The Storage.
         """
-        datetime = Datetime.now()
-        assert initialized_storage.get_slot(datetime) is None
+        print(slots[-5]['start'])
+        asd = Datetime.strptime(initialized_storage.data[-5]['start'], "%d %B %Y %H:%M")
+        assert asd == slots[-5]['start']
+        slot = initialized_storage.get_slot(slots[-5]['start'])
+        assert slot == slots[-5]
 
-    def test_delete_slot(self, initialized_storage: Storage):
+    def test_delete_slot(self, slots, initialized_storage: Storage):
         """Test that the storage returns False when a non existing slot is deleted.
 
         Args:
             initialized_storage (Storage): The Storage.
         """
-        datetime = Datetime.now()
-        assert not initialized_storage.delete_slot(datetime)
+        assert initialized_storage.delete_slot(slots[-1]['start'])
+        assert len(initialized_storage.data) == len(slots) - 1
 
-    def test_get_last_slot(self, initialized_storage: Storage):
+    def test_get_last_slot(self, slots, initialized_storage: Storage):
         """Test that the storage returns None when requesting the last slot on empty dataset.
 
         Args:
             initialized_storage (Storage): The Storage.
         """
-        assert initialized_storage.get_last_slot() is not None
+        assert initialized_storage.get_last_slot() == slots[-1]
 
     def test_get_slots_between(self, slots, initialized_storage: Storage):
         """Test that the storage returns an empty list requesting multiple slots on empty dataset.

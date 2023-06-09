@@ -158,8 +158,15 @@ class JSONStorage(Storage):
 
     def get_slot(self, start: datetime) -> dict | None:
         for slot in self.data:
-            if slot['start'] == start:
-                return slot
+            start_datetime = datetime_from_string(slot['start'])
+            parsed_slot = {}
+            parsed_slot['start'] = start_datetime
+            if start_datetime == start:
+                if 'end' in slot:
+                    parsed_slot['end'] = datetime_from_string(slot['end'])
+                if 'description' in slot:
+                    parsed_slot['description'] = slot['description']
+                return parsed_slot
         return None
 
     def edit_slot(self,
