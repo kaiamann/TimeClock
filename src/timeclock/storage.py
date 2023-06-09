@@ -6,7 +6,7 @@ Provides a general interface, as well as a JSON implementation.
 import json
 import os
 from abc import ABC, abstractmethod
-from datetime import date, datetime
+from datetime import datetime
 from subprocess import call
 
 from .utils import datetime_from_string, format_datetime, has_keywords
