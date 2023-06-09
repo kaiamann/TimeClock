@@ -1,6 +1,10 @@
 # TimeClock
 
+<<<<<<< HEAD
 ![Ubuntu Build](https://github.com/kaiamann/TimeClock/actions/workflows/python-app.yml/badge.svg)
+=======
+[Ubuntu build](https://github.com/kaiamann/TimeClock/actions/workflows/python-app.yml/badge.svg)
+>>>>>>> ee151b6 (Added storage test #9)
 
 A minimal CLI that allows keeping track of working hours. Also provides users with summary functionality.
 
