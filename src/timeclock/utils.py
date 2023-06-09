@@ -147,7 +147,7 @@ def parse_date(string: str) -> tuple[Datetime, str]:
     raise ValueError
 
 
-def has_keywords(slot: dict, keywords: list) -> bool:
+def has_keywords(slot: dict, keywords: list|None) -> bool:
     """Check if the description of a slot contains the requested keywords.
 
     Args:

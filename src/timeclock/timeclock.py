@@ -95,7 +95,9 @@ class TimeClock:
         if not keywords:
             keywords = []
         duration = Timedelta()
-        for slot in self.storage.get_slots_between(start, end, keywords):
+        start_datetime = Datetime.combine(start, Datetime.min.time())
+        end_datetime = Datetime.combine(end, Datetime.max.time())
+        for slot in self.storage.get_slots_between(start_datetime, end_datetime, keywords):
             if not has_keywords(slot, keywords):
                 continue
             duration += slot['end'] - slot['start']
@@ -121,7 +123,7 @@ class TimeClock:
             current_day += Timedelta(days=1)
         return duration
 
-    def holidays_between(self, start: Date, end: Date) -> list:
+    def holidays_between(self, start: Date, end: Date) -> dict:
         """Get the holidays in the given timeframe.
 
         Args:
@@ -144,7 +146,7 @@ class TimeClock:
     # -- Navigation --
     # ----------------
 
-    def list_dir(self, mode: str | None, date: Date, keywords: list = None) -> None:
+    def list_dir(self, mode: str | None, date: Date, keywords: list|None = None) -> None:
         """Attempt to provide a navigatable interface though the data.
 
         Args:
@@ -218,7 +220,9 @@ class TimeClock:
             keywords = []
 
         csv_data = []
-        for slot in self.storage.get_slots_between(start, end, keywords):
+        start_datetime = Datetime.combine(start, Datetime.min.time())
+        end_datetime = Datetime.combine(end, Datetime.max.time())
+        for slot in self.storage.get_slots_between(start_datetime, end_datetime, keywords):
             start = slot["start"]
             end = slot["end"]
             slot_dict = {

@@ -26,7 +26,7 @@ class Storage(ABC):
         """Initialize the storage.
 
         Args:
-            dataDir (str): The path to the directory in which
+            data_dir (str): The path to the directory in which
             the file should be stored.
             filename (str): The name of the data file.
         
@@ -74,8 +74,8 @@ class Storage(ABC):
         """Edit a specific slot.
 
         Args:
-            oldStart (datetime): The start time of the slot to be edited.
-            newStart (datetime): The new start time.
+            old_start (datetime): The start time of the slot to be edited.
+            new_start (datetime): The new start time.
             end (datetime): The new end time.
             description (str): The new description.
 
@@ -107,7 +107,7 @@ class Storage(ABC):
             dict|None: The newest slot, or None if data is empty.
         """
 
-    def get_slots_between(self, start: date, end: date, keywords=None) -> list:
+    def get_slots_between(self, start: datetime, end: datetime, keywords=None) -> list:
         """Get all slots in a speficic timeframe.
 
         Args:
@@ -204,20 +204,19 @@ class JSONStorage(Storage):
     def get_slots_between(self,
                           start: datetime,
                           end: datetime,
-                          keywords: list = None) -> list:
+                          keywords: list|None = None) -> list:
         slots = []
         for slot in self.data:
             if not has_keywords(slot, keywords):
                 continue
 
             slot_start = datetime_from_string(slot["start"])
-            slot_start_date = slot_start.date()
 
             slot_end = datetime.now()
             if "end" in slot:
                 slot_end = datetime_from_string(slot["end"])
 
-            if end >= slot_start_date >= start:
+            if end >= slot_start >= start:
                 parsed_slot = {}
                 parsed_slot['start'] = slot_start
                 parsed_slot['end'] = slot_end
