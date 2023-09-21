@@ -16,6 +16,7 @@ class TimeClock:
 
     def __init__(self,
                  storage: Storage,
+                 holiday_storage: Storage,
                  hours_per_day: int,
                  days_off_per_month: int,
                  locale: str,
@@ -32,6 +33,7 @@ class TimeClock:
         """
         # load config and copy values
         self.storage = storage
+        self.holiday_storage = holiday_storage
         self.hours_per_day = hours_per_day
         self.days_off_per_month = days_off_per_month
         self.locale = locale
@@ -58,7 +60,7 @@ class TimeClock:
         Args:
             end (Datetime): The point in time where tracking should stop.
             description (str): The description of what has been done.
-        
+
         Returns:
             Datetime: The start Datetime when the slot was started.
         """
@@ -86,7 +88,7 @@ class TimeClock:
         Args:
             start (Date): The start of the timeframe.
             end (Date): The end of the timeframe.
-            keywords (list, optional): Keywords that have to be 
+            keywords (list, optional): Keywords that have to be
             contained in the slots descriptions to be counted. Defaults to [].
 
         Returns:
@@ -116,14 +118,26 @@ class TimeClock:
         """
         duration = Timedelta()
         current_day = start
+        start_datetime = Datetime.combine(start, Datetime.max.time())
+        end_datetime = Datetime.combine(end, Datetime.max.time())
+        vacations = self.holiday_storage.get_slots_between(start_datetime, end_datetime)
+
         while current_day <= end:
-            # leave the day out if holiday or weekend
-            if (current_day not in self.holidays) and (current_day.weekday() not in [5, 6]):
+            # See if we're on vacation on this day
+            is_vacation = False
+            for vacation in vacations:
+                if vacation['start'].date() <= current_day <= vacation['end'].date():
+                    is_vacation = True
+
+            # leave the day out if holiday or weekend or on vacation
+            if current_day in self.holidays or current_day.weekday() in [5,6] or is_vacation:
+                pass
+            else:
                 duration += Timedelta(hours=self.hours_per_day)
             current_day += Timedelta(days=1)
         return duration
 
-    def holidays_between(self, start: Date, end: Date) -> dict:
+    def free_days_between(self, start: Date, end: Date) -> dict:
         """Get the holidays in the given timeframe.
 
         Args:
@@ -133,9 +147,23 @@ class TimeClock:
         Returns:
             list: The list of holidays.
         """
+
+        start_datetime = Datetime.combine(start, Datetime.max.time())
+        end_datetime = Datetime.combine(end, Datetime.max.time())
+        vacations = self.holiday_storage.get_slots_between(start_datetime, end_datetime)
+
         recent_holidays = {}
         current_day = start
         while current_day <= end:
+            # See if we're on vacation on this day
+            for vacation in vacations:
+                # Skip if we're on a weekend.
+                if current_day.weekday() in [5,6]:
+                    continue
+                if vacation['start'].date() <= current_day <= vacation['end'].date():
+                    recent_holidays[current_day] = vacation['description']
+                    continue
+
             if current_day in self.holidays:
                 recent_holidays[current_day] = self.holidays.get(current_day)
             current_day += Timedelta(days=1)
@@ -213,7 +241,7 @@ class TimeClock:
         Args:
             start (Date): The start of the timeframe.
             end (Date): The end of the timeframe.
-            keywords (list, optional): Keywords that have to be 
+            keywords (list, optional): Keywords that have to be
             contained in the slots descriptions to be counted. Defaults to [].
         """
         if not keywords:
@@ -260,3 +288,16 @@ class TimeClock:
         while (datetime.weekday() in [5, 6]) or (datetime.date() in self.holidays):
             datetime += Timedelta(days=1)
         return datetime
+
+    def take_vacation(self, start: Date, end: Date, description: str):
+        """Add vacation slot to the to the holidays.
+
+        Args:
+            date (start): The start of the vacation
+            date (end): The end of the vacation
+        """
+        start_datetime = Datetime.combine(start, Datetime.min.time())
+        end_datetime = Datetime.combine(end, Datetime.max.time())
+        self.holiday_storage.create_slot(start_datetime)
+        self.holiday_storage.edit_slot(start_datetime, start_datetime, end_datetime, description)
+        self.holiday_storage.save()

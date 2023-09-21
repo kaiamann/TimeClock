@@ -14,11 +14,11 @@ import yaml
 from pyfiglet import Figlet
 from git import InvalidGitRepositoryError, GitError
 
-from .storage import JSONStorage
+from . import storage
 from .timeclock import TimeClock
 from .versioncontrol import VersionControl
 from .utils import (format_date, format_datetime, format_duration, get_month, get_week,
-                    parse_date, read_lines)
+                    parse_date, read_lines, date_from_string)
 
 CONFIG_PATH = os.path.join(
     os.path.expanduser('~'),
@@ -33,11 +33,13 @@ class CLI:
     """
 
     def __init__(self, config: dict) -> None:
-
         # load config and crecreate objects
         data_dir = config['data_dir']
         filename = config['file_name']
-        self.storage = JSONStorage(data_dir, filename)
+        # Get the storage class dynamically from the config
+        storage_class_ = getattr(storage, config['storage_type'])
+        work_storage = storage_class_(data_dir, filename)
+        holiday_storage = storage_class_(data_dir, "vacation")
         try:
             self.version_control = VersionControl(data_dir)
             self.version_control.fetch()
@@ -58,7 +60,8 @@ class CLI:
             subdiv = config['locale_subdiv']
 
         self.timeclock = TimeClock(
-            self.storage,
+            work_storage,
+            holiday_storage,
             hours_per_day,
             days_off_per_month,
             locale,
@@ -75,7 +78,7 @@ class CLI:
         """
         args = vars(self.argparser.parse_args())
         editor = args['editor']
-        self.storage.edit(editor)
+        self.timeclock.storage.edit(editor)
 
 
     def track(self, args: dict) -> None:
@@ -112,7 +115,7 @@ class CLI:
             print(f"{formatted_date}: Starting at {time}.")
 
         try:
-            self.storage.save()
+            self.timeclock.storage.save()
         except FileNotFoundError as error:
             print(error)
 
@@ -147,7 +150,7 @@ class CLI:
 
         duration = self.timeclock.summary(start, end, keywords)
         tbd = self.timeclock.to_be_done(start, end)
-        recent_holidays = self.timeclock.holidays_between(start, end)
+        recent_holidays = self.timeclock.free_days_between(start, end)
 
         if duration > tbd:
             pass
@@ -231,6 +234,32 @@ class CLI:
         print(res)
         return res
 
+    def take_vacation(self, args: dict) -> None:
+        """Take a vacation.
+
+        Args:
+            args (dict): Args from the argparser.
+        """
+        questions = [
+            inquirer.Text('start',
+                        message="When does the vacation start?",
+                        default=format_date(Datetime.now().date())
+                        ),
+            inquirer.Text('end',
+                        message="When does the vacation end?",
+                        default=format_date(Datetime.now().date())
+                        ),
+            inquirer.Text('description',
+                        message="Description of the Vacation",
+                        default=""
+                        ),
+        ]
+        args = inquirer.prompt(questions)
+        start = date_from_string(args['start'])
+        end = date_from_string(args['end'])
+        description = args['description']
+        self.timeclock.take_vacation(start, end, description)
+
     def commit(self, args: dict) -> None:
         """Commit the changes.
 
@@ -255,6 +284,7 @@ class CLI:
         """Pull from the remote."""
         del args
         self.version_control.pull()
+
 
 def configure(args: dict=None) -> None:
     """Configures the TimeClock
@@ -283,6 +313,12 @@ def configure(args: dict=None) -> None:
         sorted(map(lambda x: pycountry.countries.get(alpha_2=x).name,
                    country_codes)))
 
+    # Dynamically get all the Storage implementations
+    # and make them selctable.
+    storage_types = []
+    for storage_class in storage.Storage.__subclasses__():
+        storage_types.append(storage_class.__name__)
+
     questions = [
         inquirer.Path('data_dir',
                       message="In which directory should the data be stored?",
@@ -291,7 +327,11 @@ def configure(args: dict=None) -> None:
                       ),
         inquirer.Path('file_name',
                       message="What shoud the file be named?",
-                      default="TimeClock.json"
+                      default="TimeClock"
+                      ),
+        inquirer.List('storage_type',
+                      message="What shoud the file be named?",
+                      choices=storage_types,
                       ),
         inquirer.List('hours_per_day',
                       message="How many hours to you work per day?",
@@ -367,7 +407,7 @@ def initialize_parser(cli: CLI):
 
     Args:
         cli (CLI): The cli for which the parser should be initialized.
-    
+
     Returns:
         argparser: The argparser.
     """
@@ -473,6 +513,13 @@ def initialize_parser(cli: CLI):
         help='Adds a filter for the specified keywords'
     )
     ls_parser.set_defaults(func=cli.list_dir)
+
+    # take vacation
+    vacation_parser = subparsers.add_parser(
+        "vacation",
+        description="Take vacation."
+    )
+    vacation_parser.set_defaults(func=cli.take_vacation)
 
     # commit
     commit_parser = subparsers.add_parser(

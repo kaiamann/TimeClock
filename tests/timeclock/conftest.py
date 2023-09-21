@@ -6,12 +6,12 @@ from datetime import timedelta as Timedelta
 
 import pytest
 
-from timeclock.storage import JSONStorage
+from timeclock.storage import JSONStorage, CSVStorage
 
 DATA_DIR = os.path.dirname(__file__)
-FILENAME = "Timeclock.json"
+FILENAME = "Timeclock"
 
-STORAGES = [JSONStorage]
+STORAGES = [JSONStorage, CSVStorage]
 
 @pytest.fixture
 def data_dir() -> str:

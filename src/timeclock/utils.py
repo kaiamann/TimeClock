@@ -80,6 +80,17 @@ def datetime_from_string(string: str) -> Datetime:
     """
     return Datetime.strptime(string, "%d %B %Y %H:%M")
 
+def date_from_string(string: str) -> Datetime:
+    """Parse a string into a date object.
+
+    Args:
+        string (str): The string to be parsed.
+
+    Returns:
+        Date: The date object.
+    """
+    return Datetime.strptime(string, "%d %B %Y").date()
+
 
 def get_week(date: Date) -> tuple[Date, Date]:
     """Get the start and end of the week for a particular date.

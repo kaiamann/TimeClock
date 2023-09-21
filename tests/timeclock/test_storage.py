@@ -8,10 +8,10 @@ import pytest
 from timeclock.storage import Storage
 
 @pytest.fixture(autouse=True)
-def delete_data(data_dir: str, filename: str):
+def delete_data(empty_storage: Storage):
     """Delete the test datafile"""
     yield
-    os.remove(os.path.join(data_dir, filename))
+    os.remove(empty_storage.data_path)
 
 @pytest.mark.usefixtures("delete_data")
 class TestEmptyStorage:
@@ -149,7 +149,6 @@ class TestInitializedStorage:
         Args:
             initialized_storage (Storage): The Storage.
         """
-
         start = slots[0]['start']
         end = slots[-1]['end']
         get_slots = initialized_storage.get_slots_between(start, end)
