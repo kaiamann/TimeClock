@@ -166,7 +166,7 @@ class Storage(ABC):
         return parsed_slot
 
     def get_slots_between(self, start: datetime, end: datetime, keywords=None) -> list:
-        """Get all slots in a speficic timeframe.
+        """Get all slots in a specific timeframe.
 
         Args:
             start (date): The start of the timeframe.
@@ -188,7 +188,7 @@ class Storage(ABC):
             if "end" in slot:
                 slot_end = datetime_from_string(slot["end"])
 
-            if end >= slot_start >= start:
+            if start <= slot_start <= end or start <= slot_end <= end:
                 parsed_slot = {}
                 parsed_slot['start'] = slot_start
                 parsed_slot['end'] = slot_end

@@ -118,7 +118,7 @@ class TimeClock:
         """
         duration = Timedelta()
         current_day = start
-        start_datetime = Datetime.combine(start, Datetime.max.time())
+        start_datetime = Datetime.combine(start, Datetime.min.time())
         end_datetime = Datetime.combine(end, Datetime.max.time())
         vacations = self.holiday_storage.get_slots_between(start_datetime, end_datetime)
 
@@ -148,7 +148,7 @@ class TimeClock:
             list: The list of holidays.
         """
 
-        start_datetime = Datetime.combine(start, Datetime.max.time())
+        start_datetime = Datetime.combine(start, Datetime.min.time())
         end_datetime = Datetime.combine(end, Datetime.max.time())
         vacations = self.holiday_storage.get_slots_between(start_datetime, end_datetime)
 
