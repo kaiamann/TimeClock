@@ -1,22 +1,35 @@
 """A module containing various helper methods"""
-import sys
+import os
+try:
+    import readline
+except ImportError:
+    readline = None
 from datetime import (
     timedelta as Timedelta,
     datetime as Datetime,
     date as Date,
 )
 
-def read_lines() -> str:
+histfile = os.path.expanduser(os.path.join(os.path.expanduser('~'), ".timeclock_history"))
+HISTFILE_SIZE = 100
+
+def read_line() -> str:
     """Read user input from stdin.
 
     Returns:
         str: The user iput.
     """
-    lines = []
-    for line in sys.stdin:
-        lines.append(line.strip())
 
-    return "\n".join(lines)
+    if readline and os.path.exists(histfile):
+        readline.read_history_file(histfile)
+
+    string = input()
+
+    if readline:
+        readline.set_history_length(HISTFILE_SIZE)
+        readline.write_history_file(histfile)
+
+    return string
 
 
 # Date and duration formatting

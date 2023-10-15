@@ -18,7 +18,7 @@ from . import storage
 from .timeclock import TimeClock
 from .versioncontrol import VersionControl
 from .utils import (format_date, format_datetime, format_duration, get_month, get_week,
-                    parse_date, read_lines, date_from_string)
+                    parse_date, read_line, date_from_string)
 
 CONFIG_PATH = os.path.join(
     os.path.expanduser('~'),
@@ -101,7 +101,7 @@ class CLI:
 
         if self.timeclock.is_started():
             print("Enter description. Finish by pressing Ctrl+d")
-            description = read_lines()
+            description = read_line()
             start = self.timeclock.finish(now, description)
 
             formatted_date = format_date(now)
