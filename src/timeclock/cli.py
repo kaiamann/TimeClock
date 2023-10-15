@@ -17,14 +17,20 @@ from git import InvalidGitRepositoryError, GitError
 from . import storage
 from .timeclock import TimeClock
 from .versioncontrol import VersionControl
-from .utils import (format_date, format_datetime, format_duration, get_month, get_week,
-                    parse_date, read_line, date_from_string)
-
-CONFIG_PATH = os.path.join(
-    os.path.expanduser('~'),
-    ".timeclock.yml"
+from .utils import (
+    format_date,
+    format_datetime,
+    format_duration,
+    get_month,
+    get_week,
+    parse_date,
+    read_line,
+    date_from_string,
 )
-EDITOR = os.environ.get('EDITOR', 'code')
+
+CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".timeclock.yml")
+EDITOR = os.environ.get("EDITOR", "code")
+
 
 class CLI:
     """A Command Line Interface that allows the user to track working hours.
@@ -34,10 +40,10 @@ class CLI:
 
     def __init__(self, config: dict) -> None:
         # load config and crecreate objects
-        data_dir = config['data_dir']
-        filename = config['file_name']
+        data_dir = config["data_dir"]
+        filename = config["file_name"]
         # Get the storage class dynamically from the config
-        storage_class_ = getattr(storage, config['storage_type'])
+        storage_class_ = getattr(storage, config["storage_type"])
         work_storage = storage_class_(data_dir, filename)
         holiday_storage = storage_class_(data_dir, "vacation")
         try:
@@ -50,14 +56,14 @@ class CLI:
         except GitError as error:
             print(error)
 
-        self.argparser=initialize_parser(self)
+        self.argparser = initialize_parser(self)
 
-        hours_per_day = config['hours_per_day']
-        days_off_per_month = config['days_off_per_month']
-        locale = config['locale']
+        hours_per_day = config["hours_per_day"]
+        days_off_per_month = config["days_off_per_month"]
+        locale = config["locale"]
         subdiv = None
-        if 'locale_subdiv' in config:
-            subdiv = config['locale_subdiv']
+        if "locale_subdiv" in config:
+            subdiv = config["locale_subdiv"]
 
         self.timeclock = TimeClock(
             work_storage,
@@ -65,21 +71,20 @@ class CLI:
             hours_per_day,
             days_off_per_month,
             locale,
-            subdiv
+            subdiv,
         )
 
     # Command line handlers
 
-    def edit(self, args: dict)-> None:
+    def edit(self, args: dict) -> None:
         """Edit the storage directly with the chosen editor.
 
         Args:
             editor (str): The editor.
         """
         args = vars(self.argparser.parse_args())
-        editor = args['editor']
+        editor = args["editor"]
         self.timeclock.storage.edit(editor)
-
 
     def track(self, args: dict) -> None:
         """Routine to start or stop the time tracking.
@@ -87,7 +92,7 @@ class CLI:
         Args:
             args (dict): The arguments from the argparser.
         """
-        del args
+        args = vars(self.argparser.parse_args())
         if self.version_control and self.version_control.is_behind():
             try:
                 self.version_control.pull()
@@ -95,30 +100,35 @@ class CLI:
                 print(error)
 
         now = Datetime.now()
+        formatted_datetime = format_datetime(now)
+
         if now.date() in self.timeclock.holidays:
             now = self.timeclock.next_workday(now)
             print("Today is a free day moving to " + format_date(now.date()))
 
         if self.timeclock.is_started():
-            print("Enter description. Finish by pressing Ctrl+d")
+            if args["switch"]:
+                print("Switching subject.")
+            print("Enter description.")
+
             description = read_line()
             start = self.timeclock.finish(now, description)
 
-            formatted_date = format_date(now)
-            time = now.strftime("%H:%M")
-            print(f"{formatted_date}: Ending at {time}. Worked for: {format_duration(now-start)}")
+            # Start a new slot on subject change.
+            if args["switch"]:
+                self.timeclock.start(now)
+                print(f"{formatted_datetime}: Switching subject")
+            else:
+                print(f"{formatted_datetime}: Finishing")
+            print(f"Worked for: {format_duration(now-start)}")
         else:
             self.timeclock.start(now)
-
-            formatted_date = format_date(now.date())
-            time = format_datetime(now, True)
-            print(f"{formatted_date}: Starting at {time}.")
+            print(f"{formatted_datetime}: Starting")
 
         try:
             self.timeclock.storage.save()
         except FileNotFoundError as error:
             print(error)
-
 
     def summary(self, args: dict) -> None:
         """Routine to print a summary for the chosen period.
@@ -130,23 +140,23 @@ class CLI:
 
         # handle date
         input_date = Date.today()
-        if args['date']:
-            input_date = Datetime.strptime(args['date'], '%d %B %Y').date()
+        if args["date"]:
+            input_date = Datetime.strptime(args["date"], "%d %B %Y").date()
 
         # default to day mode
         start = input_date
         end = input_date
 
         # set start end end for multi day modes
-        if args['week']:
+        if args["week"]:
             start, end = get_week(input_date)
-        if args['month']:
+        if args["month"]:
             start, end = get_month(input_date)
 
         # handle keywords
         keywords = []
-        if args['keywords']:
-            keywords = re.split(' ', args['keywords'])
+        if args["keywords"]:
+            keywords = re.split(" ", args["keywords"])
 
         duration = self.timeclock.summary(start, end, keywords)
         tbd = self.timeclock.to_be_done(start, end)
@@ -178,14 +188,16 @@ class CLI:
         args = vars(self.argparser.parse_args())
 
         if self.timeclock.is_started():
-            print("""Please finish the current work\
-            session before trying to export.""")
+            print(
+                """Please finish the current work\
+            session before trying to export."""
+            )
             return
 
         # handle date
         input_date = Date.today()
-        if args['date']:
-            input_date = Datetime.strptime(args['date'], '%d %B %Y').date()
+        if args["date"]:
+            input_date = Datetime.strptime(args["date"], "%d %B %Y").date()
 
         # default to day mode
         start = input_date
@@ -193,17 +205,17 @@ class CLI:
         filename = format_date(input_date)
 
         # set start end end for multi day modes
-        if args['week']:
+        if args["week"]:
             start, end = get_week(input_date)
             filename = f"Week {start.isocalendar().week} {start.year}"
-        if args['month']:
+        if args["month"]:
             start, end = get_month(input_date)
             filename = f"{Datetime.strftime(start,'%B %Y')}"
 
         # handle keywords
         keywords = []
-        if args['keywords']:
-            keywords = re.split(' ', args['keywords'])
+        if args["keywords"]:
+            keywords = re.split(" ", args["keywords"])
 
         self.timeclock.export(filename, start, end, keywords)
 
@@ -222,13 +234,13 @@ class CLI:
         # handle date
         date = Datetime.now().date()
         mode = None
-        if args['date']:
-            date, mode = parse_date(args['date'])
+        if args["date"]:
+            date, mode = parse_date(args["date"])
 
         # handle keywords
         keywords = []
-        if args['keywords']:
-            keywords = re.split(' ', args['keywords'])
+        if args["keywords"]:
+            keywords = re.split(" ", args["keywords"])
 
         res = self.timeclock.list_dir(mode, date, keywords)
         print(res)
@@ -241,23 +253,24 @@ class CLI:
             args (dict): Args from the argparser.
         """
         questions = [
-            inquirer.Text('start',
-                        message="When does the vacation start?",
-                        default=format_date(Datetime.now().date())
-                        ),
-            inquirer.Text('end',
-                        message="When does the vacation end?",
-                        default=format_date(Datetime.now().date())
-                        ),
-            inquirer.Text('description',
-                        message="Description of the Vacation",
-                        default=""
-                        ),
+            inquirer.Text(
+                "start",
+                message="When does the vacation start?",
+                default=format_date(Datetime.now().date()),
+            ),
+            inquirer.Text(
+                "end",
+                message="When does the vacation end?",
+                default=format_date(Datetime.now().date()),
+            ),
+            inquirer.Text(
+                "description", message="Description of the Vacation", default=""
+            ),
         ]
         args = inquirer.prompt(questions)
-        start = date_from_string(args['start'])
-        end = date_from_string(args['end'])
-        description = args['description']
+        start = date_from_string(args["start"])
+        end = date_from_string(args["end"])
+        description = args["description"]
         self.timeclock.take_vacation(start, end, description)
 
     def commit(self, args: dict) -> None:
@@ -286,7 +299,7 @@ class CLI:
         self.version_control.pull()
 
 
-def configure(args: dict=None) -> None:
+def configure(args: dict = None) -> None:
     """Configures the TimeClock
 
     Asks the user for important configuration parameters:
@@ -306,12 +319,11 @@ def configure(args: dict=None) -> None:
 
     locales = holidays.list_supported_countries()
     # filter out all the country codes that don't exist in pycountry
-    country_codes = list(
-        filter(lambda x: pycountry.countries.get(alpha_2=x), locales))
+    country_codes = list(filter(lambda x: pycountry.countries.get(alpha_2=x), locales))
     # get the country names
     country_names = list(
-        sorted(map(lambda x: pycountry.countries.get(alpha_2=x).name,
-                   country_codes)))
+        sorted(map(lambda x: pycountry.countries.get(alpha_2=x).name, country_codes))
+    )
 
     # Dynamically get all the Storage implementations
     # and make them selctable.
@@ -320,33 +332,37 @@ def configure(args: dict=None) -> None:
         storage_types.append(storage_class.__name__)
 
     questions = [
-        inquirer.Path('data_dir',
-                      message="In which directory should the data be stored?",
-                      default=os.path.join(os.path.expanduser(
-                          '~'), "Documents", "TimeClock") + os.path.sep
-                      ),
-        inquirer.Path('file_name',
-                      message="What shoud the file be named?",
-                      default="TimeClock"
-                      ),
-        inquirer.List('storage_type',
-                      message="What shoud the file be named?",
-                      choices=storage_types,
-                      ),
-        inquirer.List('hours_per_day',
-                      message="How many hours to you work per day?",
-                      choices=range(1, 9, 1),
-                      default=8
-                      ),
-        inquirer.List('days_off_per_month',
-                      message="How many days do you have off per month?",
-                      choices=list(map(lambda x: x/2, range(0, 7, 1))),
-                      default=3
-                      ),
-        inquirer.List('locale',
-                      message="Where do you live?",
-                      choices=country_names,
-                      ),
+        inquirer.Path(
+            "data_dir",
+            message="In which directory should the data be stored?",
+            default=os.path.join(os.path.expanduser("~"), "Documents", "TimeClock")
+            + os.path.sep,
+        ),
+        inquirer.Path(
+            "file_name", message="What shoud the file be named?", default="TimeClock"
+        ),
+        inquirer.List(
+            "storage_type",
+            message="What shoud the file be named?",
+            choices=storage_types,
+        ),
+        inquirer.List(
+            "hours_per_day",
+            message="How many hours to you work per day?",
+            choices=range(1, 9, 1),
+            default=8,
+        ),
+        inquirer.List(
+            "days_off_per_month",
+            message="How many days do you have off per month?",
+            choices=list(map(lambda x: x / 2, range(0, 7, 1))),
+            default=3,
+        ),
+        inquirer.List(
+            "locale",
+            message="Where do you live?",
+            choices=country_names,
+        ),
     ]
     config = inquirer.prompt(questions)
 
@@ -355,10 +371,10 @@ def configure(args: dict=None) -> None:
         return
 
     # get the country code from the human readable nam/
-    country = pycountry.countries.get(name=config['locale'])
+    country = pycountry.countries.get(name=config["locale"])
     country_code = country.alpha_2
     # save the code instead of the name
-    config['locale'] = country_code
+    config["locale"] = country_code
 
     # get the subdivs from the  holidays module
     subdiv_codes = locales[country.alpha_2]
@@ -366,35 +382,40 @@ def configure(args: dict=None) -> None:
     # filter the ones that are not in holiday subdivs
     if subdiv_codes:
         # get the name of subdiv type. E.g. "Kanton", "State", etc.
-        subdiv_type = list(pycountry.subdivisions.get(
-            country_code=country_code))[0].type
+        subdiv_type = list(pycountry.subdivisions.get(country_code=country_code))[
+            0
+        ].type
 
         # filter the ones that dont have a name...
         # TODO: some subdivs have a three letter code... # pylint: disable=fixme
         # figure out what's up with that
-        subdiv_codes = list(filter(lambda x: pycountry.subdivisions.get(
-            code=f"{country_code}-{x}"), subdiv_codes))
+        subdiv_codes = list(
+            filter(
+                lambda x: pycountry.subdivisions.get(code=f"{country_code}-{x}"),
+                subdiv_codes,
+            )
+        )
 
         def get_name_for_code(code):
-            name = pycountry.subdivisions.get(
-                code=f"{country_code}-{code}").name
+            name = pycountry.subdivisions.get(code=f"{country_code}-{code}").name
             return (name, code)
 
         subdiv_map = dict(map(get_name_for_code, subdiv_codes))
         subdiv_names = list(sorted(subdiv_map.keys()))
 
         questions = [
-            inquirer.List('subdiv',
-                          message=f"In which {subdiv_type} do you live?",
-                          choices=subdiv_names,
-                          )
+            inquirer.List(
+                "subdiv",
+                message=f"In which {subdiv_type} do you live?",
+                choices=subdiv_names,
+            )
         ]
         subdiv_config = inquirer.prompt(questions)
 
         if not subdiv_config:
             return
 
-        config['locale_subdiv'] = subdiv_map[subdiv_config['subdiv']]
+        config["locale_subdiv"] = subdiv_map[subdiv_config["subdiv"]]
 
     # print(config)
     # dump to config.yml
@@ -413,118 +434,112 @@ def initialize_parser(cli: CLI):
     """
     # for date, name in sorted(holidays.US(subdiv='CA', years=2014).items()):
     argparser = argparse.ArgumentParser(
-        prog='timeClock',
-        description='A time clock for keeping track of working hours.',
-        epilog='Calling without arguments will start the tracking process.'
+        prog="timeclock",
+        description="A timeclock for keeping track of working hours.",
+        epilog="Calling without arguments will start the tracking process.",
     )
     argparser.set_defaults(func=cli.track)
+    argparser.add_argument(
+        "-s",
+        "--switch",
+        action="store_true",
+        help="""Change the subject for the current slot.""",
+    )
 
     subparsers = argparser.add_subparsers(
-        help='refer to timeClock summary -h for further help')
+        help="refer to timeclock summary -h for further help"
+    )
 
     # create the parser for the "summary" command
     summary_parser = subparsers.add_parser("summary")
     summary_parser.add_argument(
-        '-w',
-        '--week',
+        "-w",
+        "--week",
         action="store_true",
         help="""Provides a summary over the current week.
-        Also works with -d flag for querying another week"""
+        Also works with -d flag for querying another week""",
     )
     summary_parser.add_argument(
-        '-m',
-        '--month',
+        "-m",
+        "--month",
         action="store_true",
         help="""Provides a summary over the current month.
-        Also works with -d flag for querying another month"""
+        Also works with -d flag for querying another month""",
     )
     summary_parser.add_argument(
-        '-d',
-        '--date',
+        "-d",
+        "--date",
         help="""Provides a summary for a particular date.
         DATE has to be in d.MMMM.yyyy format. e.g. "11 November 2023".
-        Defaults to the current day."""
+        Defaults to the current day.""",
     )
     summary_parser.add_argument(
-        '-k',
-        '--keywords',
-        help='Adds a filter for the specified keywords'
+        "-k", "--keywords", help="Adds a filter for the specified keywords"
     )
     summary_parser.set_defaults(func=cli.summary)
 
     # export
     export_parser = subparsers.add_parser("export")
     export_parser.add_argument(
-        '-w',
-        '--week',
+        "-w",
+        "--week",
         action="store_true",
         help="""Export the current week.
-        Also works with -d flag for querying another week"""
+        Also works with -d flag for querying another week""",
     )
     export_parser.add_argument(
-        '-m',
-        '--month',
+        "-m",
+        "--month",
         action="store_true",
         help="""Export the current month.
-        Also works with -d flag for querying another month"""
+        Also works with -d flag for querying another month""",
     )
     export_parser.add_argument(
-        '-d',
-        '--date',
+        "-d",
+        "--date",
         help="""Export a particular date.
         DATE has to be in d.MMMM.yyyy format. e.g. "11 November 2023".
-        Defaults to the current day."""
+        Defaults to the current day.""",
     )
     export_parser.add_argument(
-        '-k',
-        '--keywords',
-        help='Adds a filter for the specified keywords'
+        "-k", "--keywords", help="Adds a filter for the specified keywords"
     )
     export_parser.set_defaults(func=cli.export)
 
     # edit
     edit_parser = subparsers.add_parser("edit")
     edit_parser.add_argument(
-        '-e',
-        '--editor',
+        "-e",
+        "--editor",
         help="""Edit the JSON file storing the timeslots
         using the specified editor""",
-        default=EDITOR
+        default=EDITOR,
     )
     edit_parser.set_defaults(func=cli.edit)
 
     # init
     config_parser = subparsers.add_parser(
-        "config",
-        description="Configure the TimeClock."
+        "config", description="Configure the TimeClock."
     )
     config_parser.set_defaults(func=configure)
 
     # ls
     ls_parser = subparsers.add_parser("ls")
     ls_parser.add_argument(
-        '-d',
-        '--date',
-        help='Browse the data in a directory structured manner'
+        "-d", "--date", help="Browse the data in a directory structured manner"
     )
     ls_parser.add_argument(
-        '-k',
-        '--keywords',
-        help='Adds a filter for the specified keywords'
+        "-k", "--keywords", help="Adds a filter for the specified keywords"
     )
     ls_parser.set_defaults(func=cli.list_dir)
 
     # take vacation
-    vacation_parser = subparsers.add_parser(
-        "vacation",
-        description="Take vacation."
-    )
+    vacation_parser = subparsers.add_parser("vacation", description="Take vacation.")
     vacation_parser.set_defaults(func=cli.take_vacation)
 
     # commit
     commit_parser = subparsers.add_parser(
-        "commit",
-        description="Commit the current data to the data directory."
+        "commit", description="Commit the current data to the data directory."
     )
     commit_parser.set_defaults(func=cli.commit)
 
@@ -538,11 +553,12 @@ def initialize_parser(cli: CLI):
 
     return argparser
 
+
 def run():
     """Routine to run the CLI"""
 
     try:
-        with open(CONFIG_PATH, mode='r', encoding="utf-8") as file:
+        with open(CONFIG_PATH, mode="r", encoding="utf-8") as file:
             config = yaml.safe_load(file)
 
     except FileNotFoundError as err:
@@ -574,17 +590,11 @@ def yes_no_question(question: str) -> bool:
     Returns:
         bool: True if the answer was yes, False otherwise.
     """
-    choices = {
-        'Yes': True,
-        'No': False
-    }
-    questions = [
-        inquirer.List('init',
-                    message=question,
-                    choices=choices)
-    ]
+    choices = {"Yes": True, "No": False}
+    questions = [inquirer.List("init", message=question, choices=choices)]
     answer = inquirer.prompt(questions)
-    return choices[answer['init']]
+    return choices[answer["init"]]
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run()
