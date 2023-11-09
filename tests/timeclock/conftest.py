@@ -11,7 +11,7 @@ from timeclock.storage import JSONStorage, CSVStorage
 DATA_DIR = os.path.dirname(__file__)
 FILENAME = "Timeclock"
 
-STORAGES = [JSONStorage, CSVStorage]
+STORAGES = [CSVStorage, JSONStorage]
 
 @pytest.fixture
 def data_dir() -> str:
@@ -33,7 +33,7 @@ def slots() -> list:
         list: A list of slots
     """
     slot_list = []
-    start = Datetime.now().replace(second=0, microsecond=0)
+    start = Datetime.now().replace(second=0, microsecond=0).astimezone()
     for i in range(1,21):
         start += Timedelta(days=1)
         hours = i if i < 10 else 20-i

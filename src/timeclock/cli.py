@@ -3,7 +3,6 @@
 import argparse
 import os
 import re
-from datetime import date as Date
 from datetime import datetime as Datetime
 
 import argcomplete
@@ -99,7 +98,7 @@ class CLI:
             except GitError as error:
                 print(error)
 
-        now = Datetime.now()
+        now = Datetime.now().astimezone()
         formatted_datetime = format_datetime(now)
 
         if now.date() in self.timeclock.holidays:
@@ -139,9 +138,9 @@ class CLI:
         args = vars(self.argparser.parse_args())
 
         # handle date
-        input_date = Date.today()
+        input_date = Datetime.now().astimezone()
         if args["date"]:
-            input_date = Datetime.strptime(args["date"], "%d %B %Y").date()
+            input_date = Datetime.strptime(args["date"], "%d %B %Y").astimezone()
 
         # default to day mode
         start = input_date
@@ -195,7 +194,7 @@ class CLI:
             return
 
         # handle date
-        input_date = Date.today()
+        input_date = Datetime.now().astimezone()
         if args["date"]:
             input_date = Datetime.strptime(args["date"], "%d %B %Y").date()
 

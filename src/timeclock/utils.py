@@ -79,7 +79,7 @@ def format_datetime(datetime: Datetime, time: bool = False) -> str:
     """
     if time:
         return datetime.strftime("%H:%M")
-    return datetime.strftime("%d %B %Y %H:%M")
+    return datetime.strftime("%d %B %Y %H:%M %Z")
 
 
 def datetime_from_string(string: str) -> Datetime:
@@ -91,7 +91,10 @@ def datetime_from_string(string: str) -> Datetime:
     Returns:
         Datetime: The datetime object.
     """
-    return Datetime.strptime(string, "%d %B %Y %H:%M")
+    try:
+        return Datetime.strptime(string, "%d %B %Y %H:%M %Z").astimezone()
+    except ValueError:
+        return Datetime.strptime(string, "%d %B %Y %H:%M").astimezone()
 
 def date_from_string(string: str) -> Datetime:
     """Parse a string into a date object.
@@ -104,8 +107,13 @@ def date_from_string(string: str) -> Datetime:
     """
     return Datetime.strptime(string, "%d %B %Y").date()
 
+def get_time_max(datetime: Datetime) -> Datetime:
+    return datetime.replace(hour=23, minute=59, second=59, microsecond=99999)
 
-def get_week(date: Date) -> tuple[Date, Date]:
+def get_time_min(datetime: Datetime) -> Datetime:
+    return datetime.replace(hour=0, minute=0, second=0, microsecond=0)
+
+def get_week(datetime: Datetime) -> tuple[Datetime, Datetime]:
     """Get the start and end of the week for a particular date.
 
     Args:
@@ -114,12 +122,11 @@ def get_week(date: Date) -> tuple[Date, Date]:
     Returns:
         (Date, Date): A tuple of dates containing (start,end) dates of the week.
     """
-    start = date - Timedelta(days=date.weekday())
+    start = datetime - Timedelta(days=datetime.weekday())
     end = start + Timedelta(days=6)
-    return start, end
+    return get_time_min(start), get_time_max(end)
 
-
-def get_month(date: Date) -> tuple[Date, Date]:
+def get_month(datetime: Datetime) -> tuple[Datetime, Datetime]:
     """Get the start and end of the month for a particular date.
 
     Args:
@@ -128,11 +135,11 @@ def get_month(date: Date) -> tuple[Date, Date]:
     Returns:
         (Date, Date): A tuple of dates containing (start,end) dates of the month.
     """
-    start = date - Timedelta(days=date.day-1)
+    start = datetime - Timedelta(days=datetime.day-1)
     # make sure we're in the next month
-    next_month = date.replace(day=28) + Timedelta(days=4)
+    next_month = datetime.replace(day=28) + Timedelta(days=4)
     end = next_month - Timedelta(days=next_month.day)
-    return start, end
+    return get_time_min(start), get_time_max(end)
 
 
 def parse_date(string: str) -> tuple[Datetime, str]:
@@ -169,24 +176,3 @@ def parse_date(string: str) -> tuple[Datetime, str]:
         pass
 
     raise ValueError
-
-
-def has_keywords(slot: dict, keywords: list|None) -> bool:
-    """Check if the description of a slot contains the requested keywords.
-
-    Args:
-        slot (dict): The slot.
-        keywords (list): The keywords
-
-    Returns:
-        bool: True if description contains the keywords, false otherwise.
-    """
-    if not keywords:
-        return True
-    # Filter for relevant keywords
-    relevant = True
-    for keyword in keywords:
-        if 'description' not in slot or keyword not in slot['description']:
-            relevant = False
-            break
-    return relevant
