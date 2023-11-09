@@ -61,7 +61,7 @@ class TimeClock:
         Returns:
             Datetime: The start Datetime when the slot was started.
         """
-        start = self.storage.get_last_slot()['start']
+        start = self.storage.get_last_slot().start
         self.storage.edit_slot(start, start, end, description)
         return start
 
@@ -73,7 +73,7 @@ class TimeClock:
             bool: True if there is an open slot False otherwise.
         """
         last_slot = self.storage.get_last_slot()
-        return last_slot and 'end' not in last_slot
+        return False if last_slot.end else True
 
     # -------------
     # -- Summary --

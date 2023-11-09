@@ -25,6 +25,8 @@ from .utils import (
     parse_date,
     read_line,
     date_from_string,
+    get_time_max,
+    get_time_min,
 )
 
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".timeclock.yml")
@@ -139,12 +141,12 @@ class CLI:
 
         # handle date
         input_date = Datetime.now().astimezone()
+        # default to day mode
         if args["date"]:
             input_date = Datetime.strptime(args["date"], "%d %B %Y").astimezone()
 
-        # default to day mode
-        start = input_date
-        end = input_date
+        start = get_time_min(input_date)
+        end = get_time_max(input_date)
 
         # set start end end for multi day modes
         if args["week"]:
@@ -164,7 +166,7 @@ class CLI:
         if duration > tbd:
             pass
 
-        if start == end:
+        if start.date() == end.date():
             print(f"Summary for {format_date(start)}:")
 
         else:

@@ -59,7 +59,7 @@ class Slot:
 
 def slot_from_dict(start: str = None, end: str = None, description: str = None) -> None:
     start = datetime_from_string(start)
-    end = datetime_from_string(end)
+    end = datetime_from_string(end) if end else None
     return Slot(start, end, description)
 
 class InvalidStorageException(Exception):
