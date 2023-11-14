@@ -40,10 +40,10 @@ class CLI:
     """
 
     def __init__(self, config: dict) -> None:
-        # load config and crecreate objects
+        # Load config and create objects.
         data_dir = config["data_dir"]
         filename = config["file_name"]
-        # Get the storage class dynamically from the config
+        # Get the storage class dynamically from the config.
         storage_class_ = getattr(storage, config["storage_type"])
         work_storage = storage_class_(data_dir, filename)
         holiday_storage = storage_class_(data_dir, "vacation")
@@ -139,22 +139,22 @@ class CLI:
         """
         args = vars(self.argparser.parse_args())
 
-        # handle date
+        # Handle date
         input_date = Datetime.now().astimezone()
-        # default to day mode
+        # Default to day mode.
         if args["date"]:
             input_date = Datetime.strptime(args["date"], "%d %B %Y").astimezone()
 
         start = get_time_min(input_date)
         end = get_time_max(input_date)
 
-        # set start end end for multi day modes
-        if args["week"]:
+        # Set start end end for multi day modes.
+        if args["week"] != 0:
             start, end = get_week(input_date)
         if args["month"]:
             start, end = get_month(input_date)
 
-        # handle keywords
+        # Handle keywords.
         keywords = []
         if args["keywords"]:
             keywords = re.split(" ", args["keywords"])
@@ -180,46 +180,6 @@ class CLI:
         print(f"Worked for: {format_duration(duration)}")
         print(f"To be done: {format_duration(tbd-duration)}")
 
-    def export(self, args: dict) -> None:
-        """Routine to export the data as csv.
-
-        Args:
-            args (dict): The arguments from the argparser
-        """
-        args = vars(self.argparser.parse_args())
-
-        if self.timeclock.is_started():
-            print(
-                """Please finish the current work\
-            session before trying to export."""
-            )
-            return
-
-        # handle date
-        input_date = Datetime.now().astimezone()
-        if args["date"]:
-            input_date = Datetime.strptime(args["date"], "%d %B %Y").date()
-
-        # default to day mode
-        start = input_date
-        end = input_date
-        filename = format_date(input_date)
-
-        # set start end end for multi day modes
-        if args["week"]:
-            start, end = get_week(input_date)
-            filename = f"Week {start.isocalendar().week} {start.year}"
-        if args["month"]:
-            start, end = get_month(input_date)
-            filename = f"{Datetime.strftime(start,'%B %Y')}"
-
-        # handle keywords
-        keywords = []
-        if args["keywords"]:
-            keywords = re.split(" ", args["keywords"])
-
-        self.timeclock.export(filename, start, end, keywords)
-
     def list_dir(self, args: dict) -> None:
         """Routine to navigate the data in a directory-like structure
 
@@ -232,13 +192,13 @@ class CLI:
 
         args = vars(self.argparser.parse_args())
 
-        # handle date
+        # Handle date.
         date = Datetime.now().date()
         mode = None
         if args["date"]:
             date, mode = parse_date(args["date"])
 
-        # handle keywords
+        # Handle keywords.
         keywords = []
         if args["keywords"]:
             keywords = re.split(" ", args["keywords"])
@@ -312,7 +272,7 @@ def configure(args: dict = None) -> None:
     locale: The current locale of the user to fetch local holidays
 
     Args:
-        args (dirct): The arguments from the argparser.
+        args (dict): The arguments from the argparser.
     """
     # print header if config is called for the first time
     if not args:
@@ -327,7 +287,7 @@ def configure(args: dict = None) -> None:
     )
 
     # Dynamically get all the Storage implementations
-    # and make them selctable.
+    # and make them selectable.
     storage_types = []
     for storage_class in storage.Storage.__subclasses__():
         storage_types.append(storage_class.__name__)
@@ -340,11 +300,11 @@ def configure(args: dict = None) -> None:
             + os.path.sep,
         ),
         inquirer.Path(
-            "file_name", message="What shoud the file be named?", default="TimeClock"
+            "file_name", message="What should the file be named?", default="TimeClock"
         ),
         inquirer.List(
             "storage_type",
-            message="What shoud the file be named?",
+            message="What should the file be named?",
             choices=storage_types,
         ),
         inquirer.List(
@@ -367,29 +327,29 @@ def configure(args: dict = None) -> None:
     ]
     config = inquirer.prompt(questions)
 
-    # do nothing if no config
+    # Do nothing if no config.
     if not config:
         return
 
-    # get the country code from the human readable nam/
+    # Get the country code from the human readable nam/
     country = pycountry.countries.get(name=config["locale"])
     country_code = country.alpha_2
-    # save the code instead of the name
+    # Save the code instead of the name.
     config["locale"] = country_code
 
-    # get the subdivs from the  holidays module
+    # Get the subdivs from the  holidays module.
     subdiv_codes = locales[country.alpha_2]
 
-    # filter the ones that are not in holiday subdivs
+    # Filter the ones that are not in holiday subdivs.
     if subdiv_codes:
-        # get the name of subdiv type. E.g. "Kanton", "State", etc.
+        # Get the name of subdiv type. E.g. "Kanton", "State", etc.
         subdiv_type = list(pycountry.subdivisions.get(country_code=country_code))[
             0
         ].type
 
-        # filter the ones that dont have a name...
+        # Filter the ones that dont have a name...
         # TODO: some subdivs have a three letter code... # pylint: disable=fixme
-        # figure out what's up with that
+        # Figure out what's up with that
         subdiv_codes = list(
             filter(
                 lambda x: pycountry.subdivisions.get(code=f"{country_code}-{x}"),
@@ -418,8 +378,7 @@ def configure(args: dict = None) -> None:
 
         config["locale_subdiv"] = subdiv_map[subdiv_config["subdiv"]]
 
-    # print(config)
-    # dump to config.yml
+    # Dump to config.yml.
     with open(CONFIG_PATH, "w+", encoding="utf-8") as file:
         yaml.dump(config, file)
 
@@ -433,7 +392,6 @@ def initialize_parser(cli: CLI):
     Returns:
         argparser: The argparser.
     """
-    # for date, name in sorted(holidays.US(subdiv='CA', years=2014).items()):
     argparser = argparse.ArgumentParser(
         prog="timeclock",
         description="A timeclock for keeping track of working hours.",
@@ -451,8 +409,15 @@ def initialize_parser(cli: CLI):
         help="refer to timeclock summary -h for further help"
     )
 
-    # create the parser for the "summary" command
+    # summary
     summary_parser = subparsers.add_parser("summary")
+    summary_parser.add_argument(
+        "-d",
+        "--date",
+        help="""Provides a summary for a particular date.
+        DATE has to be in d.MMMM.yyyy format. e.g. "11 November 2023".
+        Defaults to the current day.""",
+    )
     summary_parser.add_argument(
         "-w",
         "--week",
@@ -468,53 +433,18 @@ def initialize_parser(cli: CLI):
         Also works with -d flag for querying another month""",
     )
     summary_parser.add_argument(
-        "-d",
-        "--date",
-        help="""Provides a summary for a particular date.
-        DATE has to be in d.MMMM.yyyy format. e.g. "11 November 2023".
-        Defaults to the current day.""",
-    )
-    summary_parser.add_argument(
         "-k", "--keywords", help="Adds a filter for the specified keywords"
     )
     summary_parser.set_defaults(func=cli.summary)
-
-    # export
-    export_parser = subparsers.add_parser("export")
-    export_parser.add_argument(
-        "-w",
-        "--week",
-        action="store_true",
-        help="""Export the current week.
-        Also works with -d flag for querying another week""",
-    )
-    export_parser.add_argument(
-        "-m",
-        "--month",
-        action="store_true",
-        help="""Export the current month.
-        Also works with -d flag for querying another month""",
-    )
-    export_parser.add_argument(
-        "-d",
-        "--date",
-        help="""Export a particular date.
-        DATE has to be in d.MMMM.yyyy format. e.g. "11 November 2023".
-        Defaults to the current day.""",
-    )
-    export_parser.add_argument(
-        "-k", "--keywords", help="Adds a filter for the specified keywords"
-    )
-    export_parser.set_defaults(func=cli.export)
 
     # edit
     edit_parser = subparsers.add_parser("edit")
     edit_parser.add_argument(
         "-e",
         "--editor",
+        default=EDITOR,
         help="""Edit the JSON file storing the timeslots
         using the specified editor""",
-        default=EDITOR,
     )
     edit_parser.set_defaults(func=cli.edit)
 
@@ -534,7 +464,7 @@ def initialize_parser(cli: CLI):
     )
     ls_parser.set_defaults(func=cli.list_dir)
 
-    # take vacation
+    # vacation
     vacation_parser = subparsers.add_parser("vacation", description="Take vacation.")
     vacation_parser.set_defaults(func=cli.take_vacation)
 
@@ -578,7 +508,7 @@ def run():
 
         argcomplete.autocomplete(argparser)
 
-        # read the handler and execute
+        # Read the handler and execute.
         args = argparser.parse_args()
         args.func(args)
     except KeyboardInterrupt:
