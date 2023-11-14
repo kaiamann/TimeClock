@@ -1,14 +1,11 @@
 """Module that allows tracking of working hours."""
-import csv
-import os
-from datetime import date as Date
 from datetime import datetime as Datetime
 from datetime import timedelta as Timedelta
 
 import holidays
 
 from .storage import Storage
-from .utils import datetime_from_string, format_duration, has_keywords
+from .utils import datetime_from_string
 
 
 class TimeClock:
@@ -64,7 +61,7 @@ class TimeClock:
         Returns:
             Datetime: The start Datetime when the slot was started.
         """
-        start = self.storage.get_last_slot()['start']
+        start = self.storage.get_last_slot().start
         self.storage.edit_slot(start, start, end, description)
         return start
 
@@ -76,13 +73,13 @@ class TimeClock:
             bool: True if there is an open slot False otherwise.
         """
         last_slot = self.storage.get_last_slot()
-        return last_slot and 'end' not in last_slot
+        return not last_slot.end
 
     # -------------
     # -- Summary --
     # -------------
 
-    def summary(self, start: Date, end: Date, keywords: list = None) -> Timedelta:
+    def summary(self, start: Datetime, end: Datetime, keywords: list = None) -> Timedelta:
         """Get the amount of time that has been worked in the given timeframe.
 
         Args:
@@ -97,16 +94,14 @@ class TimeClock:
         if not keywords:
             keywords = []
         duration = Timedelta()
-        start_datetime = Datetime.combine(start, Datetime.min.time())
-        end_datetime = Datetime.combine(end, Datetime.max.time())
-        for slot in self.storage.get_slots_between(start_datetime, end_datetime, keywords):
-            if not has_keywords(slot, keywords):
+        for slot in self.storage.get_slots_between(start, end, keywords):
+            if not slot.has_keywords(keywords):
                 continue
-            duration += slot['end'] - slot['start']
-
+            slot_end = slot.end if slot.end else Datetime.now().astimezone()
+            duration += slot_end - slot.start
         return duration
 
-    def to_be_done(self, start: Date, end: Date) -> Timedelta:
+    def to_be_done(self, start: Datetime, end: Datetime) -> Timedelta:
         """Get the amount of time to be done in the given timeframe.
 
         Args:
@@ -118,26 +113,24 @@ class TimeClock:
         """
         duration = Timedelta()
         current_day = start
-        start_datetime = Datetime.combine(start, Datetime.min.time())
-        end_datetime = Datetime.combine(end, Datetime.max.time())
-        vacations = self.holiday_storage.get_slots_between(start_datetime, end_datetime)
+        vacations = self.holiday_storage.get_slots_between(start, end)
 
         while current_day <= end:
             # See if we're on vacation on this day
             is_vacation = False
             for vacation in vacations:
-                if vacation['start'].date() <= current_day <= vacation['end'].date():
+                if vacation.start <= current_day <= vacation.end:
                     is_vacation = True
 
             # leave the day out if holiday or weekend or on vacation
-            if current_day in self.holidays or current_day.weekday() in [5,6] or is_vacation:
+            if current_day.date() in self.holidays or current_day.weekday() in [5,6] or is_vacation:
                 pass
             else:
                 duration += Timedelta(hours=self.hours_per_day)
             current_day += Timedelta(days=1)
         return duration
 
-    def free_days_between(self, start: Date, end: Date) -> dict:
+    def free_days_between(self, start: Datetime, end: Datetime) -> dict:
         """Get the holidays in the given timeframe.
 
         Args:
@@ -148,9 +141,7 @@ class TimeClock:
             list: The list of holidays.
         """
 
-        start_datetime = Datetime.combine(start, Datetime.min.time())
-        end_datetime = Datetime.combine(end, Datetime.max.time())
-        vacations = self.holiday_storage.get_slots_between(start_datetime, end_datetime)
+        vacations = self.holiday_storage.get_slots_between(start, end)
 
         recent_holidays = {}
         current_day = start
@@ -160,8 +151,8 @@ class TimeClock:
                 # Skip if we're on a weekend.
                 if current_day.weekday() in [5,6]:
                     continue
-                if vacation['start'].date() <= current_day <= vacation['end'].date():
-                    recent_holidays[current_day] = vacation['description']
+                if vacation.start <= current_day <= vacation.end:
+                    recent_holidays[current_day] = vacation.description
                     continue
 
             if current_day in self.holidays:
@@ -174,7 +165,7 @@ class TimeClock:
     # -- Navigation --
     # ----------------
 
-    def list_dir(self, mode: str | None, date: Date, keywords: list|None = None) -> None:
+    def list_dir(self, mode: str | None, date: Datetime, keywords: list|None = None) -> None:
         """Attempt to provide a navigatable interface though the data.
 
         Args:
@@ -194,10 +185,10 @@ class TimeClock:
         res = []
 
         for slot in self.storage.data:
-            if not has_keywords(slot, keywords):
+            if not slot.has_keywords(keywords):
                 continue
 
-            start_datetime = datetime_from_string(slot["start"])
+            start_datetime = datetime_from_string(slot.startstart)
 
             ref_val = None
             check_val = None
@@ -231,46 +222,6 @@ class TimeClock:
 
         return res
 
-    # ------------
-    # -- Export --
-    # ------------
-
-    def export(self, filename: str, start: Date, end: Date, keywords:list = None) -> None:
-        """Export data into a csv file.
-
-        Args:
-            start (Date): The start of the timeframe.
-            end (Date): The end of the timeframe.
-            keywords (list, optional): Keywords that have to be
-            contained in the slots descriptions to be counted. Defaults to [].
-        """
-        if not keywords:
-            keywords = []
-
-        csv_data = []
-        start_datetime = Datetime.combine(start, Datetime.min.time())
-        end_datetime = Datetime.combine(end, Datetime.max.time())
-        for slot in self.storage.get_slots_between(start_datetime, end_datetime, keywords):
-            start = slot["start"]
-            end = slot["end"]
-            slot_dict = {
-                "day": start.strftime("%d.%m.%Y"),
-                "start": start.strftime("%H:%M"),
-                "end": end.strftime("%H:%M"),
-                "duration": format_duration(end - start),
-                "description": slot['description'] if "description" in slot else ""
-            }
-            csv_data.append(slot_dict)
-
-        path = os.path.join(self.storage.data_dir, f"{filename}.csv")
-
-        with open(path, "w", encoding="utf-8", newline='') as csvfile:
-            fieldnames = ['day', 'start', 'end', 'duration', 'description']
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            for slot in csv_data:
-                writer.writerow(slot)
-
     # -------------
     # -- Helpers --
     # -------------
@@ -289,15 +240,13 @@ class TimeClock:
             datetime += Timedelta(days=1)
         return datetime
 
-    def take_vacation(self, start: Date, end: Date, description: str):
+    def take_vacation(self, start: Datetime, end: Datetime, description: str):
         """Add vacation slot to the to the holidays.
 
         Args:
             date (start): The start of the vacation
             date (end): The end of the vacation
         """
-        start_datetime = Datetime.combine(start, Datetime.min.time())
-        end_datetime = Datetime.combine(end, Datetime.max.time())
-        self.holiday_storage.create_slot(start_datetime)
-        self.holiday_storage.edit_slot(start_datetime, start_datetime, end_datetime, description)
+        self.holiday_storage.create_slot(start)
+        self.holiday_storage.edit_slot(start, start, end, description)
         self.holiday_storage.save()

@@ -7,12 +7,97 @@ import csv
 import json
 import os
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timedelta
 from subprocess import call
 
-from .utils import datetime_from_string, format_datetime, has_keywords
+from .utils import datetime_from_string, format_datetime
 
 EDITOR = os.environ.get('EDITOR', 'code')
+
+class Slot:
+    """Class representing a slot"""
+
+    def __init__(self, start: datetime, end: datetime = None, description: str = None) -> None:
+        self.start = start
+        self.end = end
+        self.description = description
+
+
+    def to_dict(self) -> dict:
+        """Convert this slot to a dict.
+
+        Returns:
+            dict: This slot as a dict.
+        """
+        data = {}
+        if self.start:
+            data['start'] = format_datetime(self.start)
+        if self.end:
+            data['end'] = format_datetime(self.end)
+        if self.description:
+            data['description'] = self.description
+        return data
+
+    def duration(self) -> timedelta:
+        """Compute the duration of this slot.
+
+        Returns:
+            timedelta: The duration.
+        """
+        end = datetime.now().astimezone()
+        if self.end:
+            end = self.end
+        return end - self.start
+
+    def has_keywords(self, keywords: list) -> bool:
+        """Check if this slot's description contains keywords.
+
+        Args:
+            keywords (list): A list of keywords to check for.
+
+        Returns:
+            bool: True if the description contains one of the keywords, False otherwise.
+        """
+        if not keywords:
+            return True
+        # Filter for relevant keywords
+        relevant = True
+        for keyword in keywords:
+            if not self.description or keyword not in self.description:
+                relevant = False
+                break
+        return relevant
+
+    def lies_within(self, start: datetime, end: datetime) -> bool:
+        """Check if this slot lies within a certain timeframe.
+
+        Args:
+            start (datetime): The start of the timeframe.
+            end (datetime): The end of the timeframe.
+
+        Returns:
+            bool: True if this slot starts or ends within the given timeframe, False otherwise.
+        """
+        slot_end = self.end or datetime.now().astimezone()
+        if start <= self.start <= end or start <= slot_end <= end:
+            return True
+        return False
+
+
+def slot_from_dict(start: str = None, end: str = None, description: str = None) -> Slot:
+    """Create a new slot from a dict.
+
+    Args:
+        start (str, optional): The start. Defaults to None.
+        end (str, optional): The end. Defaults to None.
+        description (str, optional): The description. Defaults to None.
+
+    Returns:
+        _type_: _description_
+    """
+    start = datetime_from_string(start)
+    end = datetime_from_string(end) if end else None
+    return Slot(start, end, description)
 
 class InvalidStorageException(Exception):
     """Error indicating that the storage is badly configured."""
@@ -36,7 +121,7 @@ class Storage(ABC):
         self.filename = filename
 
         self.data_path = os.path.join(data_dir, filename)
-        self.data = []
+        self.data = [] # type: list[Slot]
         if not os.path.exists(self.data_path):
             self.init_dir()
         self.load()
@@ -70,11 +155,9 @@ class Storage(ABC):
         Args:
             start (datetime): The start time.
         """
-        formatted_start = format_datetime(start)
-        slot = {"start": formatted_start}
-        self.data.append(slot)
+        self.data.append(Slot(start=start))
 
-    def get_slot(self, start: datetime) -> dict | None:
+    def get_slot(self, start: datetime) -> Slot | None:
         """Get a specific slot.
 
         Args:
@@ -84,15 +167,8 @@ class Storage(ABC):
             dict|None: The slot with the specified start time, None otherwise.
         """
         for slot in self.data:
-            start_datetime = datetime_from_string(slot['start'])
-            parsed_slot = {}
-            parsed_slot['start'] = start_datetime
-            if start_datetime == start:
-                if 'end' in slot:
-                    parsed_slot['end'] = datetime_from_string(slot['end'])
-                if 'description' in slot:
-                    parsed_slot['description'] = slot['description']
-                return parsed_slot
+            if start == slot.start:
+                return slot
         return None
 
     def edit_slot(self,
@@ -111,12 +187,11 @@ class Storage(ABC):
         Returns:
             bool: True if successful, false otherwise.
         """
-        for i, slot in enumerate(self.data):
-            slot_start = datetime_from_string(slot['start'])
-            if slot_start == old_start:
-                self.data[i]['start'] = format_datetime(new_start)
-                self.data[i]['end'] = format_datetime(end)
-                self.data[i]['description'] = description
+        for slot in self.data:
+            if slot.start == old_start:
+                slot.start = new_start
+                slot.end = end
+                slot.description = description
                 return True
         return False
 
@@ -138,13 +213,12 @@ class Storage(ABC):
             bool: True if successful, False otherwise.
         """
         for slot in self.data:
-            slot_start = datetime_from_string(slot['start'])
-            if start == slot_start:
+            if start == slot.start:
                 self.data.remove(slot)
                 return True
         return False
 
-    def get_last_slot(self) -> dict | None:
+    def get_last_slot(self) -> Slot | None:
         """Get the newest slot in the dataset.
 
         Returns:
@@ -153,19 +227,9 @@ class Storage(ABC):
         if not self.data:
             return None
 
-        slot = self.data[-1]
+        return self.data[-1]
 
-        parsed_slot = {}
-        parsed_slot['start'] = datetime_from_string(slot["start"])
-        if "end" in slot:
-            parsed_slot['end'] = datetime_from_string(slot["end"])
-
-        if "description" in slot:
-            parsed_slot['description'] = slot['description']
-
-        return parsed_slot
-
-    def get_slots_between(self, start: datetime, end: datetime, keywords=None) -> list:
+    def get_slots_between(self, start: datetime, end: datetime, keywords=None) -> list[Slot]:
         """Get all slots in a specific timeframe.
 
         Args:
@@ -179,22 +243,11 @@ class Storage(ABC):
         """
         slots = []
         for slot in self.data:
-            if not has_keywords(slot, keywords):
+            if not slot.has_keywords(keywords):
                 continue
 
-            slot_start = datetime_from_string(slot["start"])
-
-            slot_end = datetime.now()
-            if "end" in slot:
-                slot_end = datetime_from_string(slot["end"])
-
-            if start <= slot_start <= end or start <= slot_end <= end:
-                parsed_slot = {}
-                parsed_slot['start'] = slot_start
-                parsed_slot['end'] = slot_end
-                if 'description' in slot:
-                    parsed_slot['description'] = slot['description']
-                slots.append(parsed_slot)
+            if slot.lies_within(start, end):
+                slots.append(slot)
         return slots
 
 class JSONStorage(Storage):
@@ -207,7 +260,9 @@ class JSONStorage(Storage):
     def load(self) -> bool:
         try:
             with open(self.data_path, "r", encoding="utf-8") as file:
-                self.data = json.load(file)
+                data = json.load(file)
+                for slot_data in data:
+                    self.data.append(slot_from_dict(**slot_data))
             return True
         except json.decoder.JSONDecodeError as err:
             message = f"{self.data_path} is not a valid JSON file."
@@ -215,7 +270,10 @@ class JSONStorage(Storage):
 
     def save(self, mode="w+") -> bool:
         with open(self.data_path, mode, encoding="utf-8") as file:
-            json.dump(self.data, file)
+            data = []
+            for slot in self.data:
+                data.append(slot.to_dict())
+            json.dump(data, file)
             return True
 
     def edit(self, editor: str):
@@ -234,20 +292,23 @@ class CSVStorage(Storage):
         with open(self.data_path, "r", encoding="utf-8") as file:
             reader = csv.reader(file, self.fieldnames)
             for row in reader:
+                # Skip header
                 if row == self.fieldnames:
                     continue
-                slot = {}
+                slot_data = {}
                 for i, key in enumerate(self.fieldnames):
                     if row[i]:
-                        slot[key] = row[i]
-                self.data.append(slot)
+                        slot_data[key] = row[i]
+                print(slot_data)
+                self.data.append(slot_from_dict(**slot_data))
             return True
 
     def save(self, mode="w+") -> bool:
         with open(self.data_path, mode, encoding="utf-8") as file:
             writer = csv.DictWriter(file, self.fieldnames)
             writer.writeheader()
-            writer.writerows(self.data)
+            for slot in self.data:
+                writer.writerow(slot.to_dict())
             return True
 
     def edit(self, editor: str) -> None:
