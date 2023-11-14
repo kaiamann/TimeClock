@@ -571,15 +571,18 @@ def run():
         print("No or invalid config. Aborting")
         return
 
-    cli = CLI(config)
+    try:
+        cli = CLI(config)
 
-    argparser = cli.argparser
+        argparser = cli.argparser
 
-    argcomplete.autocomplete(argparser)
+        argcomplete.autocomplete(argparser)
 
-    # read the handler and execute
-    args = argparser.parse_args()
-    args.func(args)
+        # read the handler and execute
+        args = argparser.parse_args()
+        args.func(args)
+    except KeyboardInterrupt:
+        print("Aborting.")
 
 
 def yes_no_question(question: str) -> bool:
