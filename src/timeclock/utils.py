@@ -108,9 +108,25 @@ def date_from_string(string: str) -> Datetime:
     return Datetime.strptime(string, "%d %B %Y").date()
 
 def get_time_max(datetime: Datetime) -> Datetime:
+    """Get the end of a day.
+
+    Args:
+        datetime (Datetime): A day.
+
+    Returns:
+        Datetime: The end of the given day.
+    """
     return datetime.replace(hour=23, minute=59, second=59, microsecond=99999)
 
 def get_time_min(datetime: Datetime) -> Datetime:
+    """Get the beginning of a day.
+
+    Args:
+        datetime (Datetime): A day.
+
+    Returns:
+        Datetime: The beginning of the day.
+    """
     return datetime.replace(hour=0, minute=0, second=0, microsecond=0)
 
 def get_week(datetime: Datetime) -> tuple[Datetime, Datetime]:

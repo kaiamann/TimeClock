@@ -73,7 +73,7 @@ class TimeClock:
             bool: True if there is an open slot False otherwise.
         """
         last_slot = self.storage.get_last_slot()
-        return False if last_slot.end else True
+        return not last_slot.end
 
     # -------------
     # -- Summary --

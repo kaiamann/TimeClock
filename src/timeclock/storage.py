@@ -24,6 +24,11 @@ class Slot:
 
 
     def to_dict(self) -> dict:
+        """Convert this slot to a dict.
+
+        Returns:
+            dict: This slot as a dict.
+        """
         data = {}
         if self.start:
             data['start'] = format_datetime(self.start)
@@ -34,12 +39,25 @@ class Slot:
         return data
 
     def duration(self) -> timedelta:
+        """Compute the duration of this slot.
+
+        Returns:
+            timedelta: The duration.
+        """
         end = datetime.now().astimezone()
         if self.end:
             end = self.end
         return end - self.start
 
-    def has_keywords(self, keywords: list):
+    def has_keywords(self, keywords: list) -> bool:
+        """Check if this slot's description contains keywords.
+
+        Args:
+            keywords (list): A list of keywords to check for.
+
+        Returns:
+            bool: True if the description contains one of the keywords, False otherwise.
+        """
         if not keywords:
             return True
         # Filter for relevant keywords
@@ -51,6 +69,15 @@ class Slot:
         return relevant
 
     def lies_within(self, start: datetime, end: datetime) -> bool:
+        """Check if this slot lies within a certain timeframe.
+
+        Args:
+            start (datetime): The start of the timeframe.
+            end (datetime): The end of the timeframe.
+
+        Returns:
+            bool: True if this slot starts or ends within the given timeframe, False otherwise.
+        """
         slot_end = self.end or datetime.now().astimezone()
         if start <= self.start <= end or start <= slot_end <= end:
             return True
@@ -216,6 +243,7 @@ class Storage(ABC):
 class JSONStorage(Storage):
     """A Storage implementation that a JSON file."""
 
+    @override
     def __init__(self, data_dir: str, filename: str) -> None:
         filename = f"{filename}.json"
         super().__init__(data_dir, filename)
@@ -271,7 +299,6 @@ class CSVStorage(Storage):
             writer = csv.DictWriter(file, self.fieldnames)
             writer.writeheader()
             for slot in self.data:
-                data = slot.to_dict()
                 writer.writerow(slot.to_dict())
             return True
 
