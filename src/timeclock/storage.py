@@ -84,7 +84,17 @@ class Slot:
         return False
 
 
-def slot_from_dict(start: str = None, end: str = None, description: str = None) -> None:
+def slot_from_dict(start: str = None, end: str = None, description: str = None) -> Slot:
+    """Create a new slot from a dict.
+
+    Args:
+        start (str, optional): The start. Defaults to None.
+        end (str, optional): The end. Defaults to None.
+        description (str, optional): The description. Defaults to None.
+
+    Returns:
+        _type_: _description_
+    """
     start = datetime_from_string(start)
     end = datetime_from_string(end) if end else None
     return Slot(start, end, description)
@@ -243,7 +253,6 @@ class Storage(ABC):
 class JSONStorage(Storage):
     """A Storage implementation that a JSON file."""
 
-    @override
     def __init__(self, data_dir: str, filename: str) -> None:
         filename = f"{filename}.json"
         super().__init__(data_dir, filename)
