@@ -98,7 +98,7 @@ class TimeClock:
             if not slot.has_keywords(keywords):
                 continue
             slot_end = slot.end if slot.end else Datetime.now().astimezone()
-            duration += slot_end - slot.start
+            duration += min(slot_end, end) - max(slot.start, start)
         return duration
 
     def to_be_done(self, start: Datetime, end: Datetime) -> Timedelta:
