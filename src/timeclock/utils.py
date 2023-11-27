@@ -105,7 +105,7 @@ def date_from_string(string: str) -> Datetime:
     Returns:
         Date: The date object.
     """
-    return Datetime.strptime(string, "%d %B %Y").date()
+    return Datetime.strptime(string, "%d %B %Y").astimezone()
 
 def get_time_max(datetime: Datetime) -> Datetime:
     """Get the end of a day.

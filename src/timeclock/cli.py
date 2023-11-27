@@ -229,8 +229,8 @@ class CLI:
             ),
         ]
         args = inquirer.prompt(questions)
-        start = date_from_string(args["start"])
-        end = date_from_string(args["end"])
+        start = get_time_min(date_from_string(args["start"]))
+        end = get_time_max(date_from_string(args["end"]))
         description = args["description"]
         self.timeclock.take_vacation(start, end, description)
 
