@@ -218,6 +218,17 @@ class Storage(ABC):
                 return True
         return False
 
+    def get_first_slot(self) -> Slot | None:
+        """Get the newest slot in the dataset.
+
+        Returns:
+            dict|None: The oldest slot, or None if data is empty.
+        """
+        if not self.data:
+            return None
+
+        return self.data[0]
+
     def get_last_slot(self) -> Slot | None:
         """Get the newest slot in the dataset.
 

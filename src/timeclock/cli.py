@@ -144,15 +144,21 @@ class CLI:
         # Default to day mode.
         if args["date"]:
             input_date = Datetime.strptime(args["date"], "%d %B %Y").astimezone()
-
         start = get_time_min(input_date)
         end = get_time_max(input_date)
 
-        # Set start end end for multi day modes.
-        if args["week"] != 0:
+
+        # Set start end end for multi day modes if start
+        if args["week"]:
             start, end = get_week(input_date)
         if args["month"]:
             start, end = get_month(input_date)
+
+        # Overwerite the start and end date if set.
+        if args["start"]:
+            start = get_time_min(Datetime.strptime(args["start"], "%d %B %Y")).astimezone()
+        if args["end"]:
+            end = get_time_max(Datetime.strptime(args["end"], "%d %B %Y")).astimezone()
 
         # Handle keywords.
         keywords = []
@@ -431,6 +437,20 @@ def initialize_parser(cli: CLI):
         action="store_true",
         help="""Provides a summary over the current month.
         Also works with -d flag for querying another month""",
+    )
+    summary_parser.add_argument(
+        "-s",
+        "--start",
+        help="""Provides a summary for a particular date.
+        DATE has to be in d.MMMM.yyyy format. e.g. "11 November 2023".
+        Defaults to the current day.""",
+    )
+    summary_parser.add_argument(
+        "-e",
+        "--end",
+        help="""Provides a summary for a particular date.
+        DATE has to be in d.MMMM.yyyy format. e.g. "11 November 2023".
+        Defaults to the current day.""",
     )
     summary_parser.add_argument(
         "-k", "--keywords", help="Adds a filter for the specified keywords"

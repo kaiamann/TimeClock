@@ -158,6 +158,7 @@ class TimeClock:
             if current_day in self.holidays:
                 recent_holidays[current_day] = self.holidays.get(current_day)
             current_day += Timedelta(days=1)
+            current_day = current_day.astimezone()
 
         return recent_holidays
 
