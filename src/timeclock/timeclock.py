@@ -115,7 +115,7 @@ class TimeClock:
         current_day = start
         vacations = self.holiday_storage.get_slots_between(start, end)
 
-        while current_day <= end:
+        while current_day < end:
             # See if we're on vacation on this day
             is_vacation = False
             for vacation in vacations:
@@ -128,6 +128,7 @@ class TimeClock:
             else:
                 duration += Timedelta(hours=self.hours_per_day)
             current_day += Timedelta(days=1)
+            current_day = current_day.astimezone()
         return duration
 
     def free_days_between(self, start: Datetime, end: Datetime) -> dict:

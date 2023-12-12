@@ -116,7 +116,7 @@ def get_time_max(datetime: Datetime) -> Datetime:
     Returns:
         Datetime: The end of the given day.
     """
-    return datetime.replace(hour=23, minute=59, second=59, microsecond=99999)
+    return datetime.replace(hour=23, minute=59, second=59, microsecond=999999)
 
 def get_time_min(datetime: Datetime) -> Datetime:
     """Get the beginning of a day.
