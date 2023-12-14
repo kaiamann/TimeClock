@@ -151,11 +151,11 @@ def get_month(datetime: Datetime) -> tuple[Datetime, Datetime]:
     Returns:
         (Date, Date): A tuple of dates containing (start,end) dates of the month.
     """
-    start = datetime - Timedelta(days=datetime.day-1)
+    start = get_time_min(datetime - Timedelta(days=datetime.day-1)).astimezone()
     # make sure we're in the next month
     next_month = datetime.replace(day=28) + Timedelta(days=4)
-    end = next_month - Timedelta(days=next_month.day)
-    return get_time_min(start), get_time_max(end)
+    end = get_time_max(next_month - Timedelta(days=next_month.day)).astimezone()
+    return start, end
 
 
 def parse_date(string: str) -> tuple[Datetime, str]:
