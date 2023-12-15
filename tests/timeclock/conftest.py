@@ -6,7 +6,7 @@ from datetime import timedelta as Timedelta
 
 import pytest
 
-from timeclock.storage import JSONStorage, CSVStorage
+from timeclock.storage import JSONStorage, CSVStorage, Slot
 
 DATA_DIR = os.path.dirname(__file__)
 FILENAME = "Timeclock"
@@ -39,11 +39,7 @@ def slots() -> list:
         hours = i if i < 10 else 20-i
         end = start + Timedelta(hours=hours)
         description = "odd" if i % 2 == 1 else "even"
-        slot = {
-            'start': start,
-            'end': end,
-            'description': description
-        }
+        slot = Slot(start, end, description)
         slot_list.append(slot)
     return slot_list
 
@@ -52,8 +48,7 @@ def initialized_storage(slots, request): # pylint: disable=W0621
     """Build an initialized Storage"""
     storage = request.param(DATA_DIR, FILENAME)
     for slot in slots:
-        storage.create_slot(slot['start'])
-        storage.edit_slot(slot['start'], slot['start'], slot['end'], slot['description'])#
+        storage.add_slot(slot)
     return storage
 
 @pytest.fixture(params=STORAGES)

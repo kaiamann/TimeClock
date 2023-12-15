@@ -23,18 +23,16 @@ class Slot:
         self.description = description
 
 
-    def to_dict(self) -> dict:
+    def as_dict(self) -> dict:
         """Convert this slot to a dict.
 
         Returns:
             dict: This slot as a dict.
         """
-        data = {}
-        if self.start:
-            data['start'] = format_datetime(self.start)
-        if self.end:
-            data['end'] = format_datetime(self.end)
-        if self.description:
+        data = vars(self)
+        for key, value in data.items():
+            if isinstance(value, datetime):
+                data[key] = format_datetime(value)
             data['description'] = self.description
         return data
 
@@ -82,6 +80,14 @@ class Slot:
         if start <= self.start <= end or start <= slot_end <= end:
             return True
         return False
+
+class Contract(Slot):
+
+    def __init__(self, start: datetime, end: datetime = None, description: str = None, hours_per_day: float = 8, days_off_per_month: float = 0, working_days: list[int] = range(0,5)) -> None:
+        super.__init__(start, end, description)
+        self.hours_per_day = hours_per_day
+        self.days_off_per_month = days_off_per_month
+        self.working_days = working_days
 
 
 def slot_from_dict(start: str = None, end: str = None, description: str = None) -> Slot:
@@ -149,13 +155,13 @@ class Storage(ABC):
             bool: True if successful, false otherwise.
         """
 
-    def create_slot(self, start: datetime) -> None:
+    def add_slot(self, slot: Slot) -> None:
         """Create a new slot.
 
         Args:
             start (datetime): The start time.
         """
-        self.data.append(Slot(start=start))
+        self.data.append(slot)
 
     def get_slot(self, start: datetime) -> Slot | None:
         """Get a specific slot.
@@ -170,30 +176,6 @@ class Storage(ABC):
             if start == slot.start:
                 return slot
         return None
-
-    def edit_slot(self,
-                  old_start: datetime,
-                  new_start: datetime,
-                  end: datetime,
-                  description: str) -> bool:
-        """Edit a specific slot.
-
-        Args:
-            old_start (datetime): The start time of the slot to be edited.
-            new_start (datetime): The new start time.
-            end (datetime): The new end time.
-            description (str): The new description.
-
-        Returns:
-            bool: True if successful, false otherwise.
-        """
-        for slot in self.data:
-            if slot.start == old_start:
-                slot.start = new_start
-                slot.end = end
-                slot.description = description
-                return True
-        return False
 
     @abstractmethod
     def edit(self, editor: str) -> None:
@@ -283,7 +265,7 @@ class JSONStorage(Storage):
         with open(self.data_path, mode, encoding="utf-8") as file:
             data = []
             for slot in self.data:
-                data.append(slot.to_dict())
+                data.append(slot.as_dict())
             json.dump(data, file)
             return True
 
@@ -319,7 +301,7 @@ class CSVStorage(Storage):
             writer = csv.DictWriter(file, self.fieldnames)
             writer.writeheader()
             for slot in self.data:
-                writer.writerow(slot.to_dict())
+                writer.writerow(slot.as_dict())
             return True
 
     def edit(self, editor: str) -> None:

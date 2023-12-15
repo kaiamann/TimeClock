@@ -5,7 +5,7 @@ from datetime import timedelta as Timedelta
 import os
 import pytest
 
-from timeclock.storage import Storage
+from timeclock.storage import Storage, Slot
 
 @pytest.fixture(autouse=True)
 def delete_data(empty_storage: Storage):
@@ -44,7 +44,8 @@ class TestEmptyStorage:
     def test_create_slot(self, empty_storage: Storage):
         """Test insertion of a new slot."""
         now = Datetime.now().replace(second=0, microsecond=0)
-        empty_storage.create_slot(now)
+
+        empty_storage.add_slot(Slot(start=now))
         assert len(empty_storage.data) == 1
         assert empty_storage.get_last_slot().start == now
         assert empty_storage.get_slot(now).start == now
@@ -121,9 +122,9 @@ class TestInitializedStorage:
             initialized_storage (Storage): The Storage.
         """
         storage_slot = initialized_storage.data[-5]
-        assert storage_slot.start == slots[-5]['start']
-        assert storage_slot.end == slots[-5]['end']
-        assert storage_slot.description == slots[-5]['description']
+        assert storage_slot.start == slots[-5].start
+        assert storage_slot.end == slots[-5].end
+        assert storage_slot.description == slots[-5].description
 
     def test_delete_slot(self, slots, initialized_storage: Storage):
         """Test that the storage returns False when a non existing slot is deleted.
@@ -131,7 +132,7 @@ class TestInitializedStorage:
         Args:
             initialized_storage (Storage): The Storage.
         """
-        assert initialized_storage.delete_slot(slots[-1]['start'])
+        assert initialized_storage.delete_slot(slots[-1].start)
         assert len(initialized_storage.data) == len(slots) - 1
 
     def test_get_last_slot(self, slots, initialized_storage: Storage):
@@ -141,9 +142,9 @@ class TestInitializedStorage:
             initialized_storage (Storage): The Storage.
         """
         last_slot = initialized_storage.get_last_slot()
-        assert last_slot.start == slots[-1]['start']
-        assert last_slot.end == slots[-1]['end']
-        assert last_slot.description == slots[-1]['description']
+        assert last_slot.start == slots[-1].start
+        assert last_slot.end == slots[-1].end
+        assert last_slot.description == slots[-1].description
 
     def test_get_slots_between(self, slots, initialized_storage: Storage):
         """Test that the storage returns an empty list requesting multiple slots on empty dataset.
@@ -151,12 +152,12 @@ class TestInitializedStorage:
         Args:
             initialized_storage (Storage): The Storage.
         """
-        start = slots[0]['start']
-        end = slots[-1]['end']
+        start = slots[0].start
+        end = slots[-1].end
         storage_slots = initialized_storage.get_slots_between(start, end)
         assert len(initialized_storage.data) == len(slots)
         # assert len(slots) == len(get_slots)
         for i, storage_slot in enumerate(storage_slots):
-            assert slots[i]['start'] == storage_slot.start
-            assert slots[i]['end'] == storage_slot.end
-            assert slots[i]['description'] == storage_slot.description
+            assert slots[i].start == storage_slot.start
+            assert slots[i].end == storage_slot.end
+            assert slots[i].description == storage_slot.description

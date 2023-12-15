@@ -47,6 +47,7 @@ class CLI:
         storage_class_ = getattr(storage, config["storage_type"])
         work_storage = storage_class_(data_dir, filename)
         holiday_storage = storage_class_(data_dir, "vacation")
+        contract_storage = storage_class_(data_dir, "contract")
         try:
             self.version_control = VersionControl(data_dir)
             self.version_control.fetch()
@@ -69,6 +70,7 @@ class CLI:
         self.timeclock = TimeClock(
             work_storage,
             holiday_storage,
+            contract_storage,
             hours_per_day,
             days_off_per_month,
             locale,
