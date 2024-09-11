@@ -1,57 +1,87 @@
-"""Set up fixtures used by the tests"""
-
-import os
-from datetime import datetime as Datetime
-from datetime import timedelta as Timedelta
-
 import pytest
+import os
 
-from timeclock.storage import JSONStorage, CSVStorage, Slot
-
-DATA_DIR = os.path.dirname(__file__)
-FILENAME = "Timeclock"
-
-STORAGES = [CSVStorage, JSONStorage]
-
-@pytest.fixture
-def data_dir() -> str:
-    """Get the data directory"""
-    return DATA_DIR
+from timeclock import all_subclasses
+from timeclock.models import Model, ContractSlot, Contract, Project, User, Employer
+from timeclock.storage import Storage
+from datetime import datetime, timedelta
 
 @pytest.fixture
-def filename() -> str:
-    """Get the data filename"""
-    return FILENAME
+def storage():
+    file_name = "test.sqlite"
+    yield Storage(file_name)
+    # os.remove(file_name)
+
+@pytest.fixture(params=[Employer, ContractSlot, ProjectSlot, ])
+def example_models(request):
+    builder_function = f"example_{request.param.__name__}_list"
+    if builder_function in globals():
+        return globals()[builder_function]()
+    return []
+    # raise NotImplementedError(f"Implement {builder_function}!")
 
 @pytest.fixture
-def slots() -> list:
-    """Generates a bunch of slots.
+def example_contracts():
+    return example_Contract_list()
 
-    Sums up to 110 hours.
+def example_ContractSlot_list():
+    slots = []
+    start = datetime(year=2023, month=12, day=31, hour=12, minute=12)
+    arguments = {
+        "start": start,
+        "end": start + timedelta(hours=2),
+        "description": "test"
+    }
 
-    Returns:
-        list: A list of slots
-    """
-    slot_list = []
-    start = Datetime.now().replace(second=0, microsecond=0).astimezone()
-    for i in range(1,21):
-        start += Timedelta(days=1)
-        hours = i if i < 10 else 20-i
-        end = start + Timedelta(hours=hours)
-        description = "odd" if i % 2 == 1 else "even"
-        slot = Slot(start, end, description)
-        slot_list.append(slot)
-    return slot_list
+    current_arguments = {}
+    for contract in example_Contract_list():
+        current_arguments["contract"] = contract
+        for key, value in arguments.items():
+            current_arguments[key] = value
+            slots.append(ContractSlot(**current_arguments))
 
-@pytest.fixture(params=STORAGES)
-def initialized_storage(slots, request): # pylint: disable=W0621
-    """Build an initialized Storage"""
-    storage = request.param(DATA_DIR, FILENAME)
-    for slot in slots:
-        storage.add_slot(slot)
-    return storage
+    return slots
 
-@pytest.fixture(params=STORAGES)
-def empty_storage(request):
-    """Build an empty Storage"""
-    return request.param(DATA_DIR, FILENAME)
+
+def example_Contract_list():
+
+    user = User(name="Test User")
+    employer = Employer(name="Test Employer")
+
+    # First test contract
+    start = datetime(year=2023, month=12, day=31, hour=12, minute=12)
+    arguments = {
+        "name": "something",
+        "user": user,
+        "start": start,
+        "end": start + timedelta(hours=2),
+        "description": "Test Description",
+        "employer": employer,
+        "hours_per_week": 3.5,
+        "days_off_per_month": 2.3,
+        "work_days": list(range(0, 5)),
+    }
+
+    contracts = []
+    contracts.append(Contract(**arguments))
+
+    return contracts
+
+def example_Employer_list():
+    pass
+
+def example_Project_list():
+    projects = []
+
+    # First test contract
+    start = datetime(year=2023, month=12, day=31, hour=12, minute=12)
+    arguments = {
+        "name": "Test Name",
+        "start": start,
+        "end": start + timedelta(hours=2),
+        "description": "Test Description",
+    }
+
+    projects.append(Project(**arguments))
+
+    return projects

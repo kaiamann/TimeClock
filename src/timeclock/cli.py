@@ -6,6 +6,7 @@ import re
 from datetime import datetime as Datetime
 
 import argcomplete
+import calendar
 import holidays
 import inquirer
 import pycountry
@@ -13,7 +14,9 @@ import yaml
 from pyfiglet import Figlet
 from git import InvalidGitRepositoryError, GitError
 
-from . import storage
+from . import models
+from .models import Slot, Contract, ContractList, SlotList
+from .storage import Storage
 from .timeclock import TimeClock
 from .versioncontrol import VersionControl
 from .utils import (
@@ -44,10 +47,18 @@ class CLI:
         data_dir = config["data_dir"]
         filename = config["file_name"]
         # Get the storage class dynamically from the config.
-        storage_class_ = getattr(storage, config["storage_type"])
-        work_storage = storage_class_(data_dir, filename)
-        holiday_storage = storage_class_(data_dir, "vacation")
-        contract_storage = storage_class_(data_dir, "contract")
+        file_handler = Storage.get_handler(config["file_format"])
+
+        work_data = file_handler.read(f"{os.path.join(data_dir, filename)}.{file_handler.storage_format}")
+        holiday_data = file_handler.read(f"{os.path.join(data_dir, "vacation")}.{file_handler.storage_format}")
+        contract_data = file_handler.read(f"{os.path.join(data_dir, "contracts")}.{file_handler.storage_format}")
+
+        work_storage = SlotList(work_data)
+        holiday_storage = SlotList(holiday_data)
+
+        contracts = ContractList
+        active_contract = contracts
+        # TODO load the data from the chonse format
         try:
             self.version_control = VersionControl(data_dir)
             self.version_control.fetch()
@@ -60,21 +71,21 @@ class CLI:
 
         self.argparser = initialize_parser(self)
 
-        hours_per_day = config["hours_per_day"]
-        days_off_per_month = config["days_off_per_month"]
         locale = config["locale"]
         subdiv = None
         if "locale_subdiv" in config:
             subdiv = config["locale_subdiv"]
 
+        self.locale = locale
+        self.subdiv = subdiv
+
+        contracts = contracts.data
+
         self.timeclock = TimeClock(
             work_storage,
             holiday_storage,
-            contract_storage,
-            hours_per_day,
-            days_off_per_month,
-            locale,
-            subdiv,
+            contract,
+            holidays.country_holidays(country=locale, subdiv=subdiv),
         )
 
     # Command line handlers
@@ -87,7 +98,7 @@ class CLI:
         """
         args = vars(self.argparser.parse_args())
         editor = args["editor"]
-        self.timeclock.storage.edit(editor)
+        self.timeclock.slots.edit(editor)
 
     def track(self, args: dict) -> None:
         """Routine to start or stop the time tracking.
@@ -129,7 +140,7 @@ class CLI:
             print(f"{formatted_datetime}: Starting")
 
         try:
-            self.timeclock.storage.save()
+            self.timeclock.slots.save()
         except FileNotFoundError as error:
             print(error)
 
@@ -227,20 +238,76 @@ class CLI:
                 message="When does the vacation start?",
                 default=format_date(Datetime.now().date()),
             ),
+        ]
+        args = inquirer.prompt(questions)
+        start = get_time_min(date_from_string(args["start"]))
+        questions = [
             inquirer.Text(
                 "end",
                 message="When does the vacation end?",
-                default=format_date(Datetime.now().date()),
+                default=format_date(start),
             ),
             inquirer.Text(
                 "description", message="Description of the Vacation", default=""
             ),
         ]
         args = inquirer.prompt(questions)
-        start = get_time_min(date_from_string(args["start"]))
         end = get_time_max(date_from_string(args["end"]))
         description = args["description"]
         self.timeclock.take_vacation(start, end, description)
+
+    def add_contract(self, args: dict) -> None:
+        """Add contract information.
+
+        Args:
+            args (dict): Args from the argparser.
+        """
+        del args
+        questions = [
+            inquirer.Text(
+                "start",
+                message="When does the contract start?",
+                default=format_date(Datetime.now().date()),
+            ),
+        ]
+        args = inquirer.prompt(questions)
+        start = get_time_min(date_from_string(args["start"]))
+        questions = [
+            inquirer.Text(
+                "end",
+                message="When does the contract end?",
+                default=format_date(start),
+            ),
+            inquirer.Text(
+                "description", message="Description of the contract", default=""
+            ),
+            inquirer.Checkbox(
+                "work_days",
+                message="On which days do you usually work?",
+                choices=list(calendar.day_name),
+                default=list(calendar.day_name)[:5],
+            ),
+            inquirer.List(
+                "hours_per_week",
+                message="How many hours to you work per week?",
+                choices=range(1, 41, 1),
+                default=8,
+            ),
+            inquirer.List(
+                "days_off_per_month",
+                message="How many days do you have off per month?",
+                choices=list(map(lambda x: x / 2, range(0, 7, 1))),
+                default=3,
+            ),
+        ]
+        args = inquirer.prompt(questions)
+        end = get_time_max(date_from_string(args["end"]))
+        description = args["description"]
+        work_days = args["work_days"]
+        hours_per_week = args["hours_per_week"]
+        days_off_per_month = args["days_off_per_month"]
+        self.timeclock.add_contract(start, end, description, hours_per_week, days_off_per_month, work_days)
+
 
     def commit(self, args: dict) -> None:
         """Commit the changes.
@@ -297,7 +364,7 @@ def configure(args: dict = None) -> None:
     # Dynamically get all the Storage implementations
     # and make them selectable.
     storage_types = []
-    for storage_class in storage.Storage.__subclasses__():
+    for storage_class in models.SlotHandler.__subclasses__():
         storage_types.append(storage_class.__name__)
 
     questions = [
@@ -339,7 +406,7 @@ def configure(args: dict = None) -> None:
     if not config:
         return
 
-    # Get the country code from the human readable nam/
+    # Get the country code from the human readable name
     country = pycountry.countries.get(name=config["locale"])
     country_code = country.alpha_2
     # Save the code instead of the name.
@@ -489,6 +556,10 @@ def initialize_parser(cli: CLI):
     # vacation
     vacation_parser = subparsers.add_parser("vacation", description="Take vacation.")
     vacation_parser.set_defaults(func=cli.take_vacation)
+
+    # contract
+    contract_parser = subparsers.add_parser("contract", description="Enter contract information.")
+    contract_parser.set_defaults(func=cli.add_contract)
 
     # commit
     commit_parser = subparsers.add_parser(

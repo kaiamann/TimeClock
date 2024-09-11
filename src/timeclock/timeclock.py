@@ -1,45 +1,54 @@
 """Module that allows tracking of working hours."""
+import os
+
 from datetime import datetime as Datetime
 from datetime import timedelta as Timedelta
 
-import holidays
-
-from .storage import Storage, Slot, Contract
+from .models import Slot, Contract, Vacation
 from .utils import datetime_from_string
 
 
 class TimeClock:
     """A class for tracking working hours."""
 
-    def __init__(self,
-                 storage: Storage,
-                 holiday_storage: Storage,
-                 contract_storage: Storage,
-                 hours_per_day: float,
-                 days_off_per_month: float,
-                 locale: str,
-                 subdiv: str | None = None,
-                 ) -> None:
-        """Initilize the TimeClock object.
+    slots: list[Slot]
+    vacations: list[Slot]
 
-        Args:
-            storage (Storage): Storage for data handling.
-            hoursPerDay (int): The work pensum per day in hours.
-            daysOffPerMonth (int): Description of the work.
-            locale (str): The locale, where the user is located.
-            subdiv (str | None, optional): The locale subdivision. Defaults to None.
-        """
+    def __init__(self, slots: list[Slot], vacations: list[Vacation], contract: Contract = None) -> None:
+        """Initialize the TimeClock"""
         # load config and copy values
-        self.storage = storage
-        self.holiday_storage = holiday_storage
-        self.hours_per_day = hours_per_day
-        self.days_off_per_month = days_off_per_month
-        self.contract_storage = contract_storage
-        self.locale = locale
-        self.subdiv = subdiv
+        self.slots = slots
+        self.vacations = vacations
+        self.contract = contract
+        self.holidays = {}
 
-        # get the holidays for the locale
-        self.holidays = holidays.country_holidays(locale, subdiv=subdiv)
+    @property
+    def slots(self):
+        return self._slots
+
+    @slots.setter
+    def slots(self, value: list[Slot]):
+        self._slots = value
+
+    @property
+    def vacations(self):
+        return self._vacations
+
+    @property
+    def holidays(self):
+        return self._holidays
+
+    @property
+    def contract(self):
+        return self._contract
+
+
+    def init_dir(self):
+        """Initialize the storage directory and put an empty stoage file into it"""
+        # create the dir if it does not exist yet
+        os.makedirs(self.data_dir, exist_ok=True)
+        # create an empty file there
+        self.save()
 
     # -------------------
     # -- Time Tracking --
@@ -52,7 +61,7 @@ class TimeClock:
             start (Datetime): The point in time where tracking should begin.
         """
 
-        self.storage.add_slot(Slot(start=start))
+        self.slots.append(Slot(start=start))
 
     def finish(self, end: Datetime, description: str) -> Datetime:
         """Finish the time tracking.
@@ -64,11 +73,10 @@ class TimeClock:
         Returns:
             Datetime: The start Datetime when the slot was started.
         """
-        last_slot = self.storage.get_last_slot()
+        last_slot = self.slots[-1]
         last_slot.end = end
         last_slot.description = description
         return last_slot.start
-
 
     def is_started(self) -> bool:
         """Check if there is an open slot that needs to be closed.
@@ -76,7 +84,7 @@ class TimeClock:
         Returns:
             bool: True if there is an open slot False otherwise.
         """
-        last_slot = self.storage.get_last_slot()
+        last_slot = self.slots.get_last_slot()
         return not last_slot.end
 
     # -------------
@@ -98,7 +106,7 @@ class TimeClock:
         if not keywords:
             keywords = []
         duration = Timedelta()
-        for slot in self.storage.get_slots_between(start, end, keywords):
+        for slot in self.slots.get_slots_between(start, end):
             if not slot.has_keywords(keywords):
                 continue
             slot_end = slot.end if slot.end else Datetime.now().astimezone()
@@ -117,7 +125,7 @@ class TimeClock:
         """
         duration = Timedelta()
         current_day = start
-        vacations = self.holiday_storage.get_slots_between(start, end)
+        vacations = self.vacations.get_slots_between(start, end)
 
         while current_day < end:
             # See if we're on vacation on this day
@@ -127,10 +135,10 @@ class TimeClock:
                     is_vacation = True
 
             # leave the day out if holiday or weekend or on vacation
-            if current_day.date() in self.holidays or current_day.weekday() in [5,6] or is_vacation:
+            if current_day.date() in self.holidays or current_day.weekday() not in self.contract.work_days or is_vacation:
                 pass
             else:
-                duration += Timedelta(hours=self.hours_per_day)
+                duration += Timedelta(hours=self.contract.get_hours_per_day())
             current_day += Timedelta(days=1)
             current_day = current_day.astimezone()
         return duration
@@ -146,7 +154,7 @@ class TimeClock:
             list: The list of holidays.
         """
 
-        vacations = self.holiday_storage.get_slots_between(start, end)
+        vacations = self.vacations.get_slots_between(start, end)
 
         recent_holidays = {}
         current_day = start
@@ -190,7 +198,7 @@ class TimeClock:
         }
         res = []
 
-        for slot in self.storage.data:
+        for slot in self.slots.data:
             if not slot.has_keywords(keywords):
                 continue
 
@@ -250,13 +258,11 @@ class TimeClock:
         """Add vacation slot to the to the holidays.
 
         Args:
-            date (start): The start of the vacation
-            date (end): The end of the vacation
+            datetme (start): The start of the vacation
+            datetime (end): The end of the vacation
+            str (description): The descripton for the vacation
         """
-        self.holiday_storage.add_slot(Slot(start, end, description))
-        self.holiday_storage.save()
+        vacation = Slot(start, end, description)
+        self.vacations.add_slot(vacation)
+        self.vacations.save()
 
-    def add_contract(self, start: Datetime, end: Datetime, description: str, hours_per_day: float, days_off_per_month: float, working_days: list[int]):
-        contract = Contract(start, end, description, hours_per_day, days_off_per_month, working_days)
-        self.contract_storage.add_slot(contract)
-        self.contract_storage.save()

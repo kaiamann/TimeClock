@@ -77,10 +77,15 @@ def format_datetime(datetime: Datetime, time: bool = False) -> str:
     Returns:
         str: The formatted datetime.
     """
-    if time:
-        return datetime.strftime("%H:%M")
-    return datetime.strftime("%d %B %Y %H:%M %Z")
-
+    try:
+        if time:
+            return datetime.astimezone().strftime("%H:%M")
+        if datetime.tzinfo:
+            return datetime.strftime("%d %B %Y %H:%M %Z")
+        else:
+            return datetime.strftime("%d %B %Y %H:%M")
+    except AttributeError:
+        return None
 
 def datetime_from_string(string: str) -> Datetime:
     """Parse a string into a datetime object.
@@ -92,9 +97,11 @@ def datetime_from_string(string: str) -> Datetime:
         Datetime: The datetime object.
     """
     try:
-        return Datetime.strptime(string, "%d %B %Y %H:%M %Z").astimezone()
+        return Datetime.strptime(string, "%d %B %Y %H:%M %Z")
     except ValueError:
-        return Datetime.strptime(string, "%d %B %Y %H:%M").astimezone()
+        return Datetime.strptime(string, "%d %B %Y %H:%M")
+    except TypeError:
+        return None
 
 def date_from_string(string: str) -> Datetime:
     """Parse a string into a date object.

@@ -1,308 +1,251 @@
-"""A module that takes care of storing working hours in slots.
-
-Provides a general interface, as well as a JSON implementation.
-"""
-
-import csv
+import sqlite3
 import json
-import os
-from abc import ABC, abstractmethod
-from datetime import datetime, timedelta
-from subprocess import call
+from datetime import datetime, timezone
+from functools import reduce
 
-from .utils import datetime_from_string, format_datetime
+from . import all_subclasses
+from .models import *
+from .query import Query
 
-EDITOR = os.environ.get('EDITOR', 'code')
+from typing import get_origin
 
-class Slot:
-    """Class representing a slot"""
+FOREIGN_KEY_SUFFIX = "_id"
+DATATYPE_MAP = {
+    str: "TEXT",
+    int: "INTEGER",
+    list: "TEXT",
+    dict: "TEXT",
+    float: "REAL",
+    datetime: datetime.__name__,
+    Model: "INTEGER",
+}
 
-    def __init__(self, start: datetime, end: datetime = None, description: str = None) -> None:
-        self.start = start
-        self.end = end
-        self.description = description
+class Storage:
 
+    def __init__(self, file_path: str):
 
-    def as_dict(self) -> dict:
-        """Convert this slot to a dict.
+        # Adapter and converter for handling the datetime type
+        def adapt_datetime_iso(val: datetime) -> str:
+            return val.astimezone(timezone.utc).isoformat()
 
-        Returns:
-            dict: This slot as a dict.
-        """
-        data = vars(self)
-        for key, value in data.items():
-            if isinstance(value, datetime):
-                data[key] = format_datetime(value)
-            data['description'] = self.description
-        return data
+        def convert_datetime(val: bytes) -> datetime:
+            return datetime.fromisoformat(val.decode()).astimezone()
 
-    def duration(self) -> timedelta:
-        """Compute the duration of this slot.
+        # Register adapter and converter for handling datetime datatype
+        sqlite3.register_adapter(datetime, adapt_datetime_iso)
+        sqlite3.register_converter(datetime.__name__, convert_datetime)
 
-        Returns:
-            timedelta: The duration.
-        """
-        end = datetime.now().astimezone()
-        if self.end:
-            end = self.end
-        return end - self.start
+        # For using the converters for query parameters
+        detect_types = sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES
 
-    def has_keywords(self, keywords: list) -> bool:
-        """Check if this slot's description contains keywords.
+        def dict_factory(cursor, row):
+            """Output keyed dict instead of list when querying"""
+            d = {}
+            for idx, col in enumerate(cursor.description):
+                d[col[0]] = row[idx]
+            return d
 
-        Args:
-            keywords (list): A list of keywords to check for.
+        self.connection = sqlite3.connect(file_path, detect_types=detect_types)
+        self.connection.row_factory = dict_factory
 
-        Returns:
-            bool: True if the description contains one of the keywords, False otherwise.
-        """
-        if not keywords:
-            return True
-        # Filter for relevant keywords
-        relevant = True
-        for keyword in keywords:
-            if not self.description or keyword not in self.description:
-                relevant = False
-                break
-        return relevant
+        # Turn foreign keys on
+        self.connection.execute('PRAGMA foreign_keys = ON;')
 
-    def lies_within(self, start: datetime, end: datetime) -> bool:
-        """Check if this slot lies within a certain timeframe.
+        self.init_tables()
+        self.init_orm()
 
-        Args:
-            start (datetime): The start of the timeframe.
-            end (datetime): The end of the timeframe.
+    def init_tables(self):
+        """Initialize all the necessary tables"""
+        # Loop over all the Model subclasses and initialize their tables if they're not template classes
+        for model in all_subclasses(Model):
+            if not model.template():
+                self.generate_table_for_model(model)
 
-        Returns:
-            bool: True if this slot starts or ends within the given timeframe, False otherwise.
-        """
-        slot_end = self.end or datetime.now().astimezone()
-        if start <= self.start <= end or start <= slot_end <= end:
-            return True
-        return False
+    def init_orm(self):
+        """Add the objects hook to the model classes"""
+        # Loop over all the Model subclasses and add orm functionalities
+        for model in all_subclasses(Model):
+            model.objects = Manager(model, self)
 
-class Contract(Slot):
+    def generate_table_for_model(self, cls: type[Model]) -> None:
+        query_parts = []
+        foreign_keys = {}
+        unique = []
+        for name, datatype in cls.get_annotations().items():
+            # Get rid of parameterized generics
+            datatype = get_origin(datatype) or datatype
 
-    def __init__(self, start: datetime, end: datetime = None, description: str = None, hours_per_day: float = 8, days_off_per_month: float = 0, working_days: list[int] = range(0,5)) -> None:
-        super.__init__(start, end, description)
-        self.hours_per_day = hours_per_day
-        self.days_off_per_month = days_off_per_month
-        self.working_days = working_days
+            # Check if the datatype is one of the types in DATATYPE_MAP or a subtype thereof
+            if not reduce(lambda b1, b2: b1 or b2, map(lambda t: issubclass(datatype, t), DATATYPE_MAP.keys())):
+                raise Exception(f"Datatype {datatype} for field {name} not supported!")
 
+            # Check if the datatype is a model reference
+            if issubclass(datatype, Model):
+                sql_column_name = name + FOREIGN_KEY_SUFFIX
+                sql_datatype = DATATYPE_MAP[Model]
+                foreign_keys[sql_column_name] = datatype
+            else:
+                sql_column_name = name
+                sql_datatype = DATATYPE_MAP[datatype]
 
-def slot_from_dict(start: str = None, end: str = None, description: str = None) -> Slot:
-    """Create a new slot from a dict.
+            column_parts = []
+            # Append name of the column
+            column_parts.append(sql_column_name)
 
-    Args:
-        start (str, optional): The start. Defaults to None.
-        end (str, optional): The end. Defaults to None.
-        description (str, optional): The description. Defaults to None.
+            # Append the datatype
+            column_parts.append(sql_datatype)
 
-    Returns:
-        _type_: _description_
-    """
-    start = datetime_from_string(start)
-    end = datetime_from_string(end) if end else None
-    return Slot(start, end, description)
+            if name in cls.primary():
+                column_parts.append(f"PRIMARY KEY")
 
-class InvalidStorageException(Exception):
-    """Error indicating that the storage is badly configured."""
+            if name in cls.unique():
+                unique.append(sql_column_name)
 
-class Storage(ABC):
-    """An interface that takes care of storing working hours in slots."""
+            # Append auto increment
+            if name in cls.auto_increment():
+                column_parts.append("AUTOINCREMENT")
 
-    def __init__(self, data_dir: str, filename: str) -> None:
-        """Initialize the storage.
+            # Append column to the rest
+            query_parts.append(" ".join(column_parts))
 
-        Args:
-            data_dir (str): The path to the directory in which
-            the file should be stored.
-            filename (str): The name of the data file.
+        # Add unique constraints in case there are any
+        if cls.unique():
+            query_parts.append(f"UNIQUE ({", ".join(cls.unique())})")
 
-        Raises:
-            InvalidStorageException: When the file is not loadable.
-        """
-        super().__init__()
-        self.data_dir = data_dir
-        self.filename = filename
+        # Add foreign keys
+        for key, target_class in foreign_keys.items():
+            query_parts.append(f"FOREIGN KEY ({key}) REFERENCES {target_class.__name__}({", ".join(target_class.primary())})")
 
-        self.data_path = os.path.join(data_dir, filename)
-        self.data = [] # type: list[Slot]
-        if not os.path.exists(self.data_path):
-            self.init_dir()
-        self.load()
+        query = f"CREATE TABLE IF NOT EXISTS {cls.__name__} ({", ".join(query_parts)})"
+        self.connection.execute(query)
+        self.connection.commit()
 
-    def init_dir(self):
-        """Initialize the storage directory and put an empty stoage file into it"""
-        # create the dir if it does not exist yet
-        os.makedirs(self.data_dir, exist_ok=True)
-        # create an empty file there
-        self.save()
+    def close(self):
+        """Close the database connection."""
+        self.connection.close()
 
-    @abstractmethod
-    def load(self) -> bool:
-        """Load the data from the data file.
+    def delete(self, model: Model):
+        """Delete a model from the database"""
+        query = f"""DELETE FROM {model.__class__.__name__} WHERE id = {model.id}"""
+        self.connection.execute(query)
+        self.connection.commit()
 
-        Returns:
-            bool: True if successful, False otherwise.
-        """
+    def read(self, model: type[Model], id: int) -> Model:
+        query = f"""SELECT * FROM {model.__name__} WHERE id = {id}"""
+        self.connection.execute(query)
+        self.connection.commit()
+        rows = self.storage.direct_query(query)
+        if rows:
+            return self._build(model, rows[0])
+        raise Exception(f"No entry with id: {id} in {model.__name__}")
 
-    @abstractmethod
-    def save(self) -> bool:
-        """Save the data to the data file.
+    def _build(self, model: type[Model], **kwargs):
+        model_kwargs = {}
+        # Iterate over the model and format the values for insert query
+        for key, datatype in model.get_annotations().items():
+            # Get rid of parameterized generics
+            datatype = get_origin(datatype) or datatype
 
-        Returns:
-            bool: True if successful, false otherwise.
-        """
+            value = None
+            if key in kwargs:
+                value = kwargs[key]
+            if key + FOREIGN_KEY_SUFFIX in kwargs:
+                value = kwargs[key + FOREIGN_KEY_SUFFIX]
 
-    def add_slot(self, slot: Slot) -> None:
-        """Create a new slot.
+            print(key, datatype, value, kwargs)
+            # In case the value is a reference to another model, get the object from storage
+            if issubclass(datatype, Model):
+                model_kwargs[key] = self.read(model, value)
+            elif issubclass(datatype, list):
+                model_kwargs[key] = list(map(int, value.split(",")))
+            elif issubclass(datatype, dict):
+                model_kwargs[key] = json.loads(value)
+            else:
+                model_kwargs[key] = value
 
-        Args:
-            start (datetime): The start time.
-        """
-        self.data.append(slot)
+        return model(**model_kwargs)
 
-    def get_slot(self, start: datetime) -> Slot | None:
-        """Get a specific slot.
+    def create(self, model: Model):
+        """Insert a model into the database"""
 
-        Args:
-            start (datetime): The start time.
+        values = {}
 
-        Returns:
-            dict|None: The slot with the specified start time, None otherwise.
-        """
-        for slot in self.data:
-            if start == slot.start:
-                return slot
-        return None
+        # Iterate over the model and format the values for insert query
+        for key, datatype in model.__class__.get_annotations().items():
+            # Get rid of parameterized generics
+            datatype = get_origin(datatype) or datatype
 
-    @abstractmethod
-    def edit(self, editor: str) -> None:
-        """Directly edit the storage with an editor.
+            value = getattr(model, key)
+            # In case the value is a reference to another model, just get its ID
+            if issubclass(datatype, Model):
+                values[key + FOREIGN_KEY_SUFFIX] = model.id
+            elif issubclass(datatype, list):
+                values[key] = ",".join(map(str, value))
+            elif issubclass(datatype, dict):
+                values[key] = json.dumps(value)
+            else:
+                values[key] = value
 
-        Args:
-            editor (string): The editor to be used.
-        """
+        query = f"""INSERT INTO {model.__class__.__name__} (
+            {f", ".join(map(lambda key: key, values.keys()))})
+            VALUES({f", ".join(map(lambda key: f":{key}", values.keys()))}
+        )"""
 
-    def delete_slot(self, start: datetime) -> bool:
-        """Delete a specific slot.
+        cursor = self.connection.execute(query, values)
+        self.connection.commit()
+        model.id = cursor.lastrowid
 
-        Args:
-            start (datetime): The start time of the slot to be deleted.
-
-        Returns:
-            bool: True if successful, False otherwise.
-        """
-        for slot in self.data:
-            if start == slot.start:
-                self.data.remove(slot)
-                return True
-        return False
-
-    def get_first_slot(self) -> Slot | None:
-        """Get the newest slot in the dataset.
-
-        Returns:
-            dict|None: The oldest slot, or None if data is empty.
-        """
-        if not self.data:
-            return None
-
-        return self.data[0]
-
-    def get_last_slot(self) -> Slot | None:
-        """Get the newest slot in the dataset.
-
-        Returns:
-            dict|None: The newest slot, or None if data is empty.
-        """
-        if not self.data:
-            return None
-
-        return self.data[-1]
-
-    def get_slots_between(self, start: datetime, end: datetime, keywords=None) -> list[Slot]:
-        """Get all slots in a specific timeframe.
+    def direct_query(self, query: str):
+        """Directly execute a query.
 
         Args:
-            start (date): The start of the timeframe.
-            end (date): The end of the timeframe.
-            keyword (list, optional): Keywords that have to be contained
-            by the slots. Defaults to [].
-
-        Returns:
-            list: The list of slots in the timeframe.
+            query (str): The query to execute.
+            values (list): The values to insert.
         """
-        slots = []
-        for slot in self.data:
-            if not slot.has_keywords(keywords):
-                continue
+        return self.connection.execute(query)
 
-            if slot.lies_within(start, end):
-                slots.append(slot)
-        return slots
+    def query(self, query: Query):
+        sql_query = self.__build_sql_query(query=query)
+        return self.direct_query(sql_query)
 
-class JSONStorage(Storage):
-    """A Storage implementation that a JSON file."""
-
-    def __init__(self, data_dir: str, filename: str) -> None:
-        filename = f"{filename}.json"
-        super().__init__(data_dir, filename)
-
-    def load(self) -> bool:
-        try:
-            with open(self.data_path, "r", encoding="utf-8") as file:
-                data = json.load(file)
-                for slot_data in data:
-                    self.data.append(slot_from_dict(**slot_data))
-            return True
-        except json.decoder.JSONDecodeError as err:
-            message = f"{self.data_path} is not a valid JSON file."
-            raise InvalidStorageException(message) from err
-
-    def save(self, mode="w+") -> bool:
-        with open(self.data_path, mode, encoding="utf-8") as file:
-            data = []
-            for slot in self.data:
-                data.append(slot.as_dict())
-            json.dump(data, file)
-            return True
-
-    def edit(self, editor: str):
-        call([editor, self.data_path])
-
-
-class CSVStorage(Storage):
-    """Implementation of Storage using a CSV file."""
-
-    def __init__(self, data_dir: str, filename: str) -> None:
-        filename = f"{filename}.csv"
-        self.fieldnames = ['start', 'end', 'description']
-        super().__init__(data_dir, filename)
-
-    def load(self) -> bool:
-        with open(self.data_path, "r", encoding="utf-8") as file:
-            reader = csv.reader(file, self.fieldnames)
-            for row in reader:
-                # Skip header
-                if row == self.fieldnames:
-                    continue
-                slot_data = {}
-                for i, key in enumerate(self.fieldnames):
-                    if row[i]:
-                        slot_data[key] = row[i]
-                print(slot_data)
-                self.data.append(slot_from_dict(**slot_data))
-            return True
-
-    def save(self, mode="w+") -> bool:
-        with open(self.data_path, mode, encoding="utf-8") as file:
-            writer = csv.DictWriter(file, self.fieldnames)
-            writer.writeheader()
-            for slot in self.data:
-                writer.writerow(slot.as_dict())
-            return True
-
-    def edit(self, editor: str) -> None:
+    def __build_sql_query(self, query: Query):
         pass
+
+
+class Manager:
+    """Manager that provides ORM functionality when attached to a Model"""
+    model: type[Model]
+    storage: Storage
+
+    def __init__(self, model: type[Model], storage: Storage) -> None:
+        self.model = model
+        self.storage = storage
+
+    # TODO: return a QuerySet or something similar here that does not excute the query right away
+    # context: maybe the list is sliced, or indexed e.g. [1:4]
+    def all(self) -> list[Model]:
+        # Directly query the table if not a template.
+        if not self.model.template():
+            query = f"SELECT * FROM {self.model.__name__}"
+        else:
+            subclasses = all_subclasses(self.model)
+            subqueries = []
+            for subclass in subclasses:
+                subqueries.append(f"SELECT {", ".join(self.model.get_annotations().keys())} FROM {subclass.__name__}")
+            query = " UNION ".join(subqueries)
+
+        rows = self.storage.direct_query(query)
+
+        # Build the objects
+        return [self.storage._build(self.model, **row) for row in rows]
+
+
+
+    # TODO: See if we want to use a QuerySet here, just like the Django ORM
+    def get(self, **kwargs) -> Model:
+        """Get a specific object"""
+        raise NotImplementedError()
+
+    def filter(self, **kwargs) -> list[Model]:
+        """Get a set of objects matching the filter"""
+        raise NotImplementedError()
