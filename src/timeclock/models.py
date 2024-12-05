@@ -6,6 +6,7 @@ Provides a general interface, as well as a JSON implementation.
 import os
 import inspect
 from datetime import datetime, timedelta
+from typing import Self
 
 # TODO: move this somewhere else preferably into the UserConfig
 EDITOR = os.environ.get("EDITOR", "code")
@@ -38,7 +39,7 @@ class Model:
         return ["id"]
 
     @staticmethod
-    def unique():
+    def unique() -> list[str]:
         """Return a list of unique keys"""
         return []
 
@@ -52,6 +53,9 @@ class Model:
             except AttributeError:
                 pass
         return annotations
+
+    def save(self):
+        self.objects.save(self)
 
     def __repr__(self):
         return str(vars(self))
@@ -86,6 +90,10 @@ class User(Model):
         self.name = name
         self.email = email
         self.settings = settings
+
+    @staticmethod
+    def unique():
+        return ["name"]
 
 
 class Employer(User):
@@ -174,22 +182,46 @@ class Slot(Model):
 
 class Project(Slot):
     name: str
+    active: bool
 
-    def __init__(
-        self, name: str, start: datetime, id: int = None, end: datetime = None, description: str = None
-    ) -> None:
-        super().__init__(start=start, description=description, id=id)
+    def __init__(self, name: str, active: bool = False, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
         self.name = name
+        self.active = active
+
+    @classmethod
+    def get_active_contract(cls):
+        query = f"SELECT id FROM {cls.__name__} WHERE active=1"
+        cursor = cls.objects.storage.direct_query(query)
+        active_dict = cursor.fetchone()
+        if not active_dict:
+            return None
+        return cls.objects.get_by_id(active_dict["id"])
+
+    def deactivate(self) -> None:
+        self.active = False
+        self.save()
+
+    def activate(self) -> None:
+        active = self.__class__.get_active_contract() # type: Project
+        if active:
+            active.deactivate()
+        self.active = True
+        self.save()
 
     @staticmethod
     def template():
         return False
 
+    @property
+    def slots(self) -> list[Self]:
+        return [ slot for slot in ProjectSlot.objects.all() if slot.project.name == self.name ]
+
 class ProjectSlot(Slot):
     project: Project
 
-    def __init__(self, project: Project, start: datetime, id: int = None, end: datetime = None, description: str = None):
-        super().__init__(start=start, end=end, description=description, id=id)
+    def __init__(self, project: Project, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.project = project
 
     @staticmethod
@@ -207,17 +239,14 @@ class Contract(Project):
     def __init__(
         self,
         user: User,
-        name: str,
-        start: datetime,
-        id: int = None,
-        end: datetime = None,
-        description: str = None,
-        employer: str = Employer,
+        employer: Employer = None,
         hours_per_week: float = 8.0,
         days_off_per_month: float = 0,
         work_days: list[int] = list(range(0, 5)),
+        *args,
+        **kwargs
     ) -> None:
-        super().__init__(id=id, name=name, start=start, end=end, description=description)
+        super().__init__(*args, **kwargs)
         self.user = user
         self.employer = employer
         self.hours_per_week = hours_per_week
@@ -230,6 +259,10 @@ class Contract(Project):
 
     def get_hours_per_day(self) -> float:
         return self.hours_per_week / len(self.work_days)
+
+    @property
+    def slots(self) -> list[Self]:
+        return [ slot for slot in ContractSlot.objects.all() if slot.contract.name == self.name ]
 
 
 class ContractSlot(Slot):

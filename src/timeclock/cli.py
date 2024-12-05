@@ -15,7 +15,7 @@ from pyfiglet import Figlet
 from git import InvalidGitRepositoryError, GitError
 
 from . import models
-from .models import Slot, Contract, ContractList, SlotList
+from .models import Employer, Contract, Slot, Vacation, ContractSlot, ProjectSlot
 from .storage import Storage
 from .timeclock import TimeClock
 from .versioncontrol import VersionControl
@@ -47,18 +47,10 @@ class CLI:
         data_dir = config["data_dir"]
         filename = config["file_name"]
         # Get the storage class dynamically from the config.
-        file_handler = Storage.get_handler(config["file_format"])
 
-        work_data = file_handler.read(f"{os.path.join(data_dir, filename)}.{file_handler.storage_format}")
-        holiday_data = file_handler.read(f"{os.path.join(data_dir, "vacation")}.{file_handler.storage_format}")
-        contract_data = file_handler.read(f"{os.path.join(data_dir, "contracts")}.{file_handler.storage_format}")
+        # Init the storage
+        Storage(file_path=f"{data_dir}.sqlite")
 
-        work_storage = SlotList(work_data)
-        holiday_storage = SlotList(holiday_data)
-
-        contracts = ContractList
-        active_contract = contracts
-        # TODO load the data from the chonse format
         try:
             self.version_control = VersionControl(data_dir)
             self.version_control.fetch()
@@ -71,21 +63,17 @@ class CLI:
 
         self.argparser = initialize_parser(self)
 
-        locale = config["locale"]
+        self.locale = config["locale"]
         subdiv = None
         if "locale_subdiv" in config:
             subdiv = config["locale_subdiv"]
-
-        self.locale = locale
         self.subdiv = subdiv
-
-        contracts = contracts.data
 
         self.timeclock = TimeClock(
             work_storage,
             holiday_storage,
-            contract,
-            holidays.country_holidays(country=locale, subdiv=subdiv),
+            Contract.get_active_contract(),
+            holidays.country_holidays(country=self.locale, subdiv=subdiv),
         )
 
     # Command line handlers
@@ -367,32 +355,11 @@ def configure(args: dict = None) -> None:
     for storage_class in models.SlotHandler.__subclasses__():
         storage_types.append(storage_class.__name__)
 
+    file_name = os.path.join(os.path.expanduser("~"), ".config", "TimeClock")
     questions = [
-        inquirer.Path(
-            "data_dir",
-            message="In which directory should the data be stored?",
-            default=os.path.join(os.path.expanduser("~"), "Documents", "TimeClock")
-            + os.path.sep,
-        ),
-        inquirer.Path(
-            "file_name", message="What should the file be named?", default="TimeClock"
-        ),
-        inquirer.List(
-            "storage_type",
-            message="What should the file be named?",
-            choices=storage_types,
-        ),
-        inquirer.List(
-            "hours_per_day",
-            message="How many hours to you work per day?",
-            choices=range(1, 9, 1),
-            default=8,
-        ),
-        inquirer.List(
-            "days_off_per_month",
-            message="How many days do you have off per month?",
-            choices=list(map(lambda x: x / 2, range(0, 7, 1))),
-            default=3,
+        inquirer.Text(
+            "name",
+            message="What's your name?"
         ),
         inquirer.List(
             "locale",
@@ -418,9 +385,7 @@ def configure(args: dict = None) -> None:
     # Filter the ones that are not in holiday subdivs.
     if subdiv_codes:
         # Get the name of subdiv type. E.g. "Kanton", "State", etc.
-        subdiv_type = list(pycountry.subdivisions.get(country_code=country_code))[
-            0
-        ].type
+        subdiv_type = list(pycountry.subdivisions.get(country_code=country_code))[0].type
 
         # Filter the ones that dont have a name...
         # TODO: some subdivs have a three letter code... # pylint: disable=fixme
@@ -621,6 +586,37 @@ def yes_no_question(question: str) -> bool:
     questions = [inquirer.List("init", message=question, choices=choices)]
     answer = inquirer.prompt(questions)
     return choices[answer["init"]]
+
+def add_contract():
+    questions = [
+        inquirer.List(
+            "employer",
+            message="Name of the employer?",
+            choices=Employer.objects.all()
+        ),
+        inquirer.List(
+            "hours_per_week",
+            message="How many hours do you work per week?",
+            choices=range(1, 50, 1),
+            default=40,
+        ),
+        inquirer.List(
+            "days_off_per_month",
+            message="How many days do you have off per month?",
+            choices=list(map(lambda x: x / 2, range(0, 7, 1))),
+            default=3,
+        ),
+        inquirer.Checkbox(
+            "work_days",
+            message="On which days do you usually work?",
+            choices=list(calendar.day_name),
+            default=list(calendar.day_name)[:5],
+        ),
+    ]
+    kwargs = inquirer.prompt(questions)
+    contract = Contract(**kwargs)
+    contract.save()
+    return contract
 
 
 if __name__ == "__main__":

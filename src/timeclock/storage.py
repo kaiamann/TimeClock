@@ -16,6 +16,7 @@ DATATYPE_MAP = {
     list: "TEXT",
     dict: "TEXT",
     float: "REAL",
+    bool: "BOOLEAN",
     datetime: datetime.__name__,
     Model: "INTEGER",
 }
@@ -51,23 +52,23 @@ class Storage:
         # Turn foreign keys on
         self.connection.execute('PRAGMA foreign_keys = ON;')
 
-        self.init_tables()
-        self.init_orm()
+        self._init_tables()
+        self._init_orm()
 
-    def init_tables(self):
+    def _init_tables(self):
         """Initialize all the necessary tables"""
         # Loop over all the Model subclasses and initialize their tables if they're not template classes
         for model in all_subclasses(Model):
             if not model.template():
-                self.generate_table_for_model(model)
+                self._generate_table_for_model(model)
 
-    def init_orm(self):
+    def _init_orm(self):
         """Add the objects hook to the model classes"""
         # Loop over all the Model subclasses and add orm functionalities
         for model in all_subclasses(Model):
             model.objects = Manager(model, self)
 
-    def generate_table_for_model(self, cls: type[Model]) -> None:
+    def _generate_table_for_model(self, cls: type[Model]) -> None:
         query_parts = []
         foreign_keys = {}
         unique = []
@@ -120,7 +121,7 @@ class Storage:
         self.connection.execute(query)
         self.connection.commit()
 
-    def close(self):
+    def _close(self):
         """Close the database connection."""
         self.connection.close()
 
@@ -130,13 +131,14 @@ class Storage:
         self.connection.execute(query)
         self.connection.commit()
 
-    def read(self, model: type[Model], id: int) -> Model:
+    def load(self, model: type[Model], id: int) -> Model:
+        if not id:
+            return None
         query = f"""SELECT * FROM {model.__name__} WHERE id = {id}"""
-        self.connection.execute(query)
-        self.connection.commit()
-        rows = self.storage.direct_query(query)
-        if rows:
-            return self._build(model, rows[0])
+        rows = self.direct_query(query)
+        kwargs = rows.fetchone()
+        if kwargs:
+            return self._build(model, **kwargs)
         raise Exception(f"No entry with id: {id} in {model.__name__}")
 
     def _build(self, model: type[Model], **kwargs):
@@ -152,10 +154,9 @@ class Storage:
             if key + FOREIGN_KEY_SUFFIX in kwargs:
                 value = kwargs[key + FOREIGN_KEY_SUFFIX]
 
-            print(key, datatype, value, kwargs)
             # In case the value is a reference to another model, get the object from storage
             if issubclass(datatype, Model):
-                model_kwargs[key] = self.read(model, value)
+                model_kwargs[key] = self.load(datatype, value)
             elif issubclass(datatype, list):
                 model_kwargs[key] = list(map(int, value.split(",")))
             elif issubclass(datatype, dict):
@@ -165,8 +166,18 @@ class Storage:
 
         return model(**model_kwargs)
 
-    def create(self, model: Model):
+
+    def create(self, type_: type[Model], **kwargs) -> Model:
         """Insert a model into the database"""
+        if not kwargs:
+            return None
+        model = type_(**kwargs)
+        model.save()
+        return model
+
+
+    def save(self, model: Model):
+        """Save a model"""
 
         values = {}
 
@@ -178,7 +189,10 @@ class Storage:
             value = getattr(model, key)
             # In case the value is a reference to another model, just get its ID
             if issubclass(datatype, Model):
-                values[key + FOREIGN_KEY_SUFFIX] = model.id
+                if isinstance(value, Model):
+                    value.save()
+                    value = value.id
+                values[key + FOREIGN_KEY_SUFFIX] = value
             elif issubclass(datatype, list):
                 values[key] = ",".join(map(str, value))
             elif issubclass(datatype, dict):
@@ -188,12 +202,16 @@ class Storage:
 
         query = f"""INSERT INTO {model.__class__.__name__} (
             {f", ".join(map(lambda key: key, values.keys()))})
-            VALUES({f", ".join(map(lambda key: f":{key}", values.keys()))}
-        )"""
+            VALUES({f", ".join(map(lambda key: f":{key}", values.keys()))})
+            ON CONFLICT(id) DO UPDATE SET
+                {", ".join([f"{key}=excluded.{key}" for key in values.keys() if key != "id"])}
+        """
 
         cursor = self.connection.execute(query, values)
         self.connection.commit()
-        model.id = cursor.lastrowid
+        # If the model didn't have an ID before set it now
+        if not model.id:
+            model.id = cursor.lastrowid
 
     def direct_query(self, query: str):
         """Directly execute a query.
@@ -202,7 +220,9 @@ class Storage:
             query (str): The query to execute.
             values (list): The values to insert.
         """
-        return self.connection.execute(query)
+        cursor = self.connection.execute(query)
+        self.connection.commit()
+        return cursor
 
     def query(self, query: Query):
         sql_query = self.__build_sql_query(query=query)
@@ -221,6 +241,12 @@ class Manager:
         self.model = model
         self.storage = storage
 
+    def create(self, *args, **kwargs):
+        return self.storage._build(self.model, *args, **kwargs)
+
+    def save(self, model: Model):
+        self.storage.save(model)
+
     # TODO: return a QuerySet or something similar here that does not excute the query right away
     # context: maybe the list is sliced, or indexed e.g. [1:4]
     def all(self) -> list[Model]:
@@ -237,9 +263,13 @@ class Manager:
         rows = self.storage.direct_query(query)
 
         # Build the objects
-        return [self.storage._build(self.model, **row) for row in rows]
+        return [self.create(**row) for row in rows]
 
+    def direct_query(self, query: str) -> list[Model]:
+        return self.storage.direct_query(query).fetchall()
 
+    def get_by_id(self, id: int):
+        return self.storage.load(self.model, id)
 
     # TODO: See if we want to use a QuerySet here, just like the Django ORM
     def get(self, **kwargs) -> Model:
