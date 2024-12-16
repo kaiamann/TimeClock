@@ -12,16 +12,18 @@ from subprocess import call
 
 from .utils import datetime_from_string, format_datetime
 
-EDITOR = os.environ.get('EDITOR', 'code')
+EDITOR = os.environ.get("EDITOR", "code")
+
 
 class Slot:
     """Class representing a slot"""
 
-    def __init__(self, start: datetime, end: datetime = None, description: str = None) -> None:
+    def __init__(
+        self, start: datetime, end: datetime = None, description: str = None
+    ) -> None:
         self.start = start
         self.end = end
         self.description = description
-
 
     def to_dict(self) -> dict:
         """Convert this slot to a dict.
@@ -31,11 +33,11 @@ class Slot:
         """
         data = {}
         if self.start:
-            data['start'] = format_datetime(self.start)
+            data["start"] = format_datetime(self.start)
         if self.end:
-            data['end'] = format_datetime(self.end)
+            data["end"] = format_datetime(self.end)
         if self.description:
-            data['description'] = self.description
+            data["description"] = self.description
         return data
 
     def duration(self) -> timedelta:
@@ -99,8 +101,10 @@ def slot_from_dict(start: str = None, end: str = None, description: str = None) 
     end = datetime_from_string(end) if end else None
     return Slot(start, end, description)
 
+
 class InvalidStorageException(Exception):
     """Error indicating that the storage is badly configured."""
+
 
 class Storage(ABC):
     """An interface that takes care of storing working hours in slots."""
@@ -121,7 +125,7 @@ class Storage(ABC):
         self.filename = filename
 
         self.data_path = os.path.join(data_dir, filename)
-        self.data = [] # type: list[Slot]
+        self.data = []  # type: list[Slot]
         if not os.path.exists(self.data_path):
             self.init_dir()
         self.load()
@@ -171,11 +175,9 @@ class Storage(ABC):
                 return slot
         return None
 
-    def edit_slot(self,
-                  old_start: datetime,
-                  new_start: datetime,
-                  end: datetime,
-                  description: str) -> bool:
+    def edit_slot(
+        self, old_start: datetime, new_start: datetime, end: datetime, description: str
+    ) -> bool:
         """Edit a specific slot.
 
         Args:
@@ -240,7 +242,9 @@ class Storage(ABC):
 
         return self.data[-1]
 
-    def get_slots_between(self, start: datetime, end: datetime, keywords=None) -> list[Slot]:
+    def get_slots_between(
+        self, start: datetime, end: datetime, keywords=None
+    ) -> list[Slot]:
         """Get all slots in a specific timeframe.
 
         Args:
@@ -260,6 +264,7 @@ class Storage(ABC):
             if slot.lies_within(start, end):
                 slots.append(slot)
         return slots
+
 
 class JSONStorage(Storage):
     """A Storage implementation that a JSON file."""
@@ -284,7 +289,7 @@ class JSONStorage(Storage):
             data = []
             for slot in self.data:
                 data.append(slot.to_dict())
-            json.dump(data, file)
+            json.dump(data, file, indent=2)
             return True
 
     def edit(self, editor: str):
@@ -296,7 +301,7 @@ class CSVStorage(Storage):
 
     def __init__(self, data_dir: str, filename: str) -> None:
         filename = f"{filename}.csv"
-        self.fieldnames = ['start', 'end', 'description']
+        self.fieldnames = ["start", "end", "description"]
         super().__init__(data_dir, filename)
 
     def load(self) -> bool:
