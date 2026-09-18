@@ -473,14 +473,14 @@ def initialize_parser(cli: CLI):
     config_parser.set_defaults(func=configure)
 
     # ls
-    ls_parser = subparsers.add_parser("ls")
-    ls_parser.add_argument(
-        "-d", "--date", help="Browse the data in a directory structured manner"
-    )
-    ls_parser.add_argument(
-        "-k", "--keywords", help="Adds a filter for the specified keywords"
-    )
-    ls_parser.set_defaults(func=cli.list_dir)
+    # ls_parser = subparsers.add_parser("ls")
+    # ls_parser.add_argument(
+    #     "-d", "--date", help="Browse the data in a directory structured manner"
+    # )
+    # ls_parser.add_argument(
+    #     "-k", "--keywords", help="Adds a filter for the specified keywords"
+    # )
+    # ls_parser.set_defaults(func=cli.list_dir)
 
     # vacation
     vacation_parser = subparsers.add_parser("vacation", description="Take vacation.")
