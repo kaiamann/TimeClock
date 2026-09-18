@@ -3,12 +3,15 @@
 Provides a general interface, as well as a JSON implementation.
 """
 
+from __future__ import annotations
+from abc import ABC, abstractmethod
 import csv
+from datetime import datetime, timedelta
 import json
 import os
-from abc import ABC, abstractmethod
-from datetime import datetime, timedelta
-from subprocess import call
+import subprocess
+import sys
+from typing import override
 
 from .utils import datetime_from_string, format_datetime
 
@@ -28,13 +31,13 @@ class Slot:
         self.end: datetime | None = end
         self.description: str | None = description
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, str]:
         """Convert this slot to a dict.
 
         Returns:
             dict: This slot as a dict.
         """
-        data = {}
+        data: dict[str, str] = {}
         if self.start:
             data["start"] = format_datetime(self.start)
         if self.end:
@@ -42,6 +45,28 @@ class Slot:
         if self.description:
             data["description"] = self.description
         return data
+
+    @classmethod
+    def from_dict(cls, data: dict[str, str]) -> Slot:
+        """Create a Slot from dict."""
+        start = (
+            datetime_from_string(data["start"])
+            if "start" in data and data["start"]
+            else None
+        )
+        if not start:
+            raise Exception(
+                f"Cannot create a Slot without a start date! {json.dumps(data, indent=2)}"
+            )
+        end = (
+            datetime_from_string(data["end"]) if "end" in data and data["end"] else None
+        )
+        description = (
+            data["description"]
+            if "description" in data and data["description"]
+            else None
+        )
+        return Slot(start, end, description)
 
     def duration(self) -> timedelta:
         """Compute the duration of this slot.
@@ -54,7 +79,7 @@ class Slot:
             end = self.end
         return end - self.start
 
-    def has_keywords(self, keywords: list) -> bool:
+    def has_keywords(self, keywords: list[str]) -> bool:
         """Check if this slot's description contains keywords.
 
         Args:
@@ -89,22 +114,6 @@ class Slot:
         return False
 
 
-def slot_from_dict(start: str = None, end: str = None, description: str = None) -> Slot:
-    """Create a new slot from a dict.
-
-    Args:
-        start: The start. Defaults to None.
-        end: The end. Defaults to None.
-        description: The description. Defaults to None.
-
-    Returns:
-        _type_: _description_
-    """
-    start = datetime_from_string(start)
-    end = datetime_from_string(end) if end else None
-    return Slot(start, end, description)
-
-
 class InvalidStorageException(Exception):
     """Error indicating that the storage is badly configured."""
 
@@ -124,21 +133,21 @@ class Storage(ABC):
             InvalidStorageException: When the file is not loadable.
         """
         super().__init__()
-        self.data_dir = data_dir
-        self.filename = filename
+        self.data_dir: str = data_dir
+        self.filename: str = filename
 
-        self.data_path = os.path.join(data_dir, filename)
-        self.data = []  # type: list[Slot]
+        self.data_path: str = os.path.join(data_dir, filename)
+        self.data: list[Slot] = []
         if not os.path.exists(self.data_path):
             self.init_dir()
-        self.load()
+        _ = self.load()
 
     def init_dir(self):
         """Initialize the storage directory and put an empty storage file into it"""
-        # create the dir if it does not exist yet
+        # Create the dir if it does not exist yet
         os.makedirs(self.data_dir, exist_ok=True)
-        # create an empty file there
-        self.save()
+        # Create an empty file there
+        _ = self.save()
 
     @abstractmethod
     def load(self) -> bool:
@@ -246,22 +255,24 @@ class Storage(ABC):
         return self.data[-1]
 
     def get_slots_between(
-        self, start: datetime, end: datetime, keywords=None
+        self,
+        start: datetime,
+        end: datetime,
+        keywords: list[str] | None = None,
     ) -> list[Slot]:
         """Get all slots in a specific timeframe.
 
         Args:
             start: The start of the timeframe.
             end: The end of the timeframe.
-            keywords: Keywords that have to be contained
-            by the slots. Defaults to [].
+            keywords: Keywords to filter by.
 
         Returns:
-            list: The list of slots in the timeframe.
+            list: The list of Slots in the timeframe.
         """
-        slots = []
+        slots: list[Slot] = []
         for slot in self.data:
-            if not slot.has_keywords(keywords):
+            if not keywords or slot.has_keywords(keywords):
                 continue
 
             if slot.lies_within(start, end):
@@ -270,59 +281,55 @@ class Storage(ABC):
 
 
 class JSONStorage(Storage):
-    """A Storage implementation that a JSON file."""
+    """A Storage implementation that uses a JSON file."""
 
     def __init__(self, data_dir: str, filename: str) -> None:
         filename = f"{filename}.json"
         super().__init__(data_dir, filename)
 
+    @override
     def load(self) -> bool:
         try:
             with open(self.data_path, "r", encoding="utf-8") as file:
-                data = json.load(file)
+                data: list[dict[str, str]] = json.load(file)
                 for slot_data in data:
-                    self.data.append(slot_from_dict(**slot_data))
+                    self.data.append(Slot.from_dict(slot_data))
             return True
         except json.decoder.JSONDecodeError as err:
             message = f"{self.data_path} is not a valid JSON file."
             raise InvalidStorageException(message) from err
 
-    def save(self, mode="w+") -> bool:
+    @override
+    def save(self, mode: str = "w+") -> bool:
         with open(self.data_path, mode, encoding="utf-8") as file:
-            data = []
+            data: list[dict[str, str]] = []
             for slot in self.data:
                 data.append(slot.to_dict())
             json.dump(data, file, indent=2)
             return True
 
-    def edit(self, editor: str):
-        call([editor, self.data_path])
+    @override
+    def edit(self, editor: str) -> None:
+        _ = subprocess.call([editor, self.data_path])
 
 
 class CSVStorage(Storage):
     """Implementation of Storage using a CSV file."""
 
     def __init__(self, data_dir: str, filename: str) -> None:
-        filename = f"{filename}.csv"
-        self.fieldnames = ["start", "end", "description"]
-        super().__init__(data_dir, filename)
+        self.fieldnames: list[str] = ["start", "end", "description"]
+        super().__init__(data_dir, f"{filename}.csv")
 
+    @override
     def load(self) -> bool:
         with open(self.data_path, "r", encoding="utf-8") as file:
-            reader = csv.reader(file, self.fieldnames)
+            reader = csv.DictReader(file)
             for row in reader:
-                # Skip header
-                if row == self.fieldnames:
-                    continue
-                slot_data = {}
-                for i, key in enumerate(self.fieldnames):
-                    if row[i]:
-                        slot_data[key] = row[i]
-                print(slot_data)
-                self.data.append(slot_from_dict(**slot_data))
+                self.data.append(Slot.from_dict(row))
             return True
 
-    def save(self, mode="w+") -> bool:
+    @override
+    def save(self, mode: str = "w+") -> bool:
         with open(self.data_path, mode, encoding="utf-8") as file:
             writer = csv.DictWriter(file, self.fieldnames)
             writer.writeheader()
@@ -330,5 +337,11 @@ class CSVStorage(Storage):
                 writer.writerow(slot.to_dict())
             return True
 
+    @override
     def edit(self, editor: str) -> None:
-        pass
+        if sys.platform == "darwin":  # macOS
+            _ = subprocess.call(("open", self.filename))
+        elif os.name == "nt":  # Windows
+            os.startfile(self.filename)
+        elif sys.platform.startswith("linux"):
+            _ = subprocess.call(("xdg-open", self.filename))
