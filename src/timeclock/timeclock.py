@@ -10,7 +10,16 @@ from .utils import datetime_from_string
 
 
 class TimeClock:
-    """A class for tracking working hours."""
+    """A class for tracking working hours.
+
+    Attributes:
+        storage: Storage for data handling.
+        hiloday_storage: Storage for holiday data.
+        hours_per_day: The workload per day in hours.
+        days_off_per_month: Description of the work.
+        locale: The locale, where the user is located.
+        subdiv: The locale subdivision. Defaults to None.
+    """
 
     def __init__(
         self,
@@ -21,16 +30,6 @@ class TimeClock:
         locale: str,
         subdiv: str | None = None,
     ) -> None:
-        """Initialize the TimeClock object.
-
-        Args:
-            storage (Storage): Storage for data handling.
-            hours_per_day (int): The workload per day in hours.
-            days_off_per_month (int): Description of the work.
-            locale (str): The locale, where the user is located.
-            subdiv (str | None, optional): The locale subdivision. Defaults to None.
-        """
-        # load config and copy values
         self.storage: Storage = storage
         self.holiday_storage: Storage = holiday_storage
         self.hours_per_day: int = hours_per_day
@@ -180,7 +179,7 @@ class TimeClock:
     def list_dir(
         self, mode: str | None, date: Datetime, keywords: list | None = None
     ) -> None:
-        """Attempt to provide a navigatable interface though the data.
+        """Attempt to provide a navigable interface though the data.
 
         Args:
             mode: either year, month or day.
@@ -202,7 +201,7 @@ class TimeClock:
             if not slot.has_keywords(keywords):
                 continue
 
-            start_datetime = datetime_from_string(slot.startstart)
+            start_datetime = datetime_from_string(slot.start)
 
             ref_val = None
             check_val = None

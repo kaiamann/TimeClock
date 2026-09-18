@@ -19,11 +19,14 @@ class Slot:
     """Class representing a slot"""
 
     def __init__(
-        self, start: datetime, end: datetime = None, description: str = None
+        self,
+        start: datetime,
+        end: datetime | None = None,
+        description: str | None = None,
     ) -> None:
-        self.start = start
-        self.end = end
-        self.description = description
+        self.start: datetime = start
+        self.end: datetime | None = end
+        self.description: str | None = description
 
     def to_dict(self) -> dict:
         """Convert this slot to a dict.
