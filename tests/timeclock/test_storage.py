@@ -15,7 +15,7 @@ def delete_data(empty_storage: Storage):
 
 @pytest.mark.usefixtures("delete_data")
 class TestEmptyStorage:
-    """Tests for an emtpty storage."""
+    """Tests for an empty storage."""
 
     def test_init(self, empty_storage: Storage):
         """Test that the data file exists.

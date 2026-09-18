@@ -14,7 +14,7 @@ class TimeClock:
 
     Attributes:
         storage: Storage for data handling.
-        hiloday_storage: Storage for holiday data.
+        holiday_storage: Storage for holiday data.
         hours_per_day: The workload per day in hours.
         days_off_per_month: Description of the work.
         locale: The locale, where the user is located.

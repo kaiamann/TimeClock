@@ -153,7 +153,7 @@ class CLI:
         if args["month"]:
             start, end = get_month(input_date)
 
-        # Overwerite the start and end date if set.
+        # Overwrite the start and end date if set.
         if args["start"]:
             start = get_time_min(
                 Datetime.strptime(args["start"], "%d %B %Y")

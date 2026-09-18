@@ -36,13 +36,13 @@ In case you do not have Python installed, you can install it via [Anaconda](http
     pip install .
     ```
 
-3. To initilaize run:
+3. To initialize run:
     ```
     timeclock
     ```
     This will take you though the configuration process.
     The configuration file will be saved in `~/.timeclock.yml`.
-    You can directly edit it with an editor of your chioce, or just run
+    You can directly edit it with an editor of your choice, or just run
     ```
     timeclock config
     ```

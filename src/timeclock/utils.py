@@ -17,7 +17,7 @@ def read_line() -> str:
     """Read user input from stdin.
 
     Returns:
-        str: The user iput.
+        str: The user input.
     """
 
     if readline and os.path.exists(histfile):
@@ -59,7 +59,7 @@ def format_date(date: Date) -> str:
     """Format a date into a human readable string.
 
     Args:
-        date (Date): The date to be formatte.
+        date (Date): The date to be formatted.
 
     Returns:
         str: The formatted date.

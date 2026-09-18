@@ -1,0 +1,20 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "useGitignore": true,
+  "dictionaryDefinitions": [
+    {
+      "name": "project-words",
+      "path": "./cspell-dictionary.txt",
+      "addWords": true
+    }
+  ],
+  "dictionaries": ["project-words"],
+  "ignorePaths": [
+    "*.egg-info",
+    "**/__pycache__",
+    "cspell.json",
+    "cspell-dictionary.txt"
+  ],
+  "files": ["**/*.{py,md,toml,yml,yaml,txt}"]
+}

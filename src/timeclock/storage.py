@@ -134,7 +134,7 @@ class Storage(ABC):
         self.load()
 
     def init_dir(self):
-        """Initialize the storage directory and put an empty stoage file into it"""
+        """Initialize the storage directory and put an empty storage file into it"""
         # create the dir if it does not exist yet
         os.makedirs(self.data_dir, exist_ok=True)
         # create an empty file there
