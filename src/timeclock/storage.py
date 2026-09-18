@@ -79,7 +79,7 @@ class Slot:
             end = self.end
         return end - self.start
 
-    def has_keywords(self, keywords: list[str]) -> bool:
+    def has_keywords(self, keywords: list[str] | None) -> bool:
         """Check if this slot's description contains keywords.
 
         Args:
@@ -272,7 +272,7 @@ class Storage(ABC):
         """
         slots: list[Slot] = []
         for slot in self.data:
-            if not keywords or slot.has_keywords(keywords):
+            if not slot.has_keywords(keywords):
                 continue
 
             if slot.lies_within(start, end):

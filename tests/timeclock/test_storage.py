@@ -48,9 +48,18 @@ class TestEmptyStorage:
         """Test insertion of a new slot."""
         now = Datetime.now().replace(second=0, microsecond=0)
         empty_storage.create_slot(now)
+
+        # Get via get_last_slot
+        last_slot = empty_storage.get_last_slot()
+        assert last_slot
+        assert last_slot.start == now
+
+        # Get directly via get_slot
+        last_slot = empty_storage.get_slot(now)
+        assert last_slot
+        assert last_slot.start == now
+
         assert len(empty_storage.data) == 1
-        assert empty_storage.get_last_slot().start == now
-        assert empty_storage.get_slot(now).start == now
 
     def test_get_slot(self, empty_storage: Storage):
         """Test that the storage returns None when a non existing slot is requested.

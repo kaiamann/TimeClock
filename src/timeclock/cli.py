@@ -39,7 +39,7 @@ class CLI:
     Also provides other functionalities, like exporting and summaries.
     """
 
-    def __init__(self, config: dict) -> None:
+    def __init__(self, config: dict[str, str | int | float]) -> None:
         # Load config and create objects.
         data_dir = config["data_dir"]
         filename = config["file_name"]
@@ -48,7 +48,7 @@ class CLI:
         work_storage = storage_class_(data_dir, filename)
         holiday_storage = storage_class_(data_dir, "vacation")
         try:
-            self.version_control = VersionControl(data_dir)
+            self.version_control: VersionControl | None = VersionControl(data_dir)
             self.version_control.fetch()
         except InvalidGitRepositoryError as error:
             self.version_control = None
@@ -57,16 +57,16 @@ class CLI:
         except GitError as error:
             print(error)
 
-        self.argparser = initialize_parser(self)
+        self.argparser: argparse.ArgumentParser = initialize_parser(self)
 
-        hours_per_day = config["hours_per_day"]
+        hours_per_day = float(config["hours_per_day"])
         days_off_per_month = config["days_off_per_month"]
         locale = config["locale"]
         subdiv = None
         if "locale_subdiv" in config:
             subdiv = config["locale_subdiv"]
 
-        self.timeclock = TimeClock(
+        self.timeclock: TimeClock = TimeClock(
             work_storage,
             holiday_storage,
             hours_per_day,
@@ -471,16 +471,6 @@ def initialize_parser(cli: CLI):
         "config", description="Configure the TimeClock."
     )
     config_parser.set_defaults(func=configure)
-
-    # ls
-    # ls_parser = subparsers.add_parser("ls")
-    # ls_parser.add_argument(
-    #     "-d", "--date", help="Browse the data in a directory structured manner"
-    # )
-    # ls_parser.add_argument(
-    #     "-k", "--keywords", help="Adds a filter for the specified keywords"
-    # )
-    # ls_parser.set_defaults(func=cli.list_dir)
 
     # vacation
     vacation_parser = subparsers.add_parser("vacation", description="Take vacation.")
