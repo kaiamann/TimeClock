@@ -52,7 +52,7 @@ In case you do not have Python installed, you can install it via [Anaconda](http
 ## Time tracking:
 The primary feature of this CLI is time tracking, which can be started and stopped with:
 ```
-timeClock
+timeclock
 ```
 Upon ending the session, you will be asked to enter some keywords about what you did.
 In case the devil possesses you and you start working on a weekend or a holiday, the session will automatically be moved to the next working day.

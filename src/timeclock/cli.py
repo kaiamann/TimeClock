@@ -147,7 +147,6 @@ class CLI:
         start = get_time_min(input_date)
         end = get_time_max(input_date)
 
-
         # Set start end end for multi day modes if start
         if args["week"]:
             start, end = get_week(input_date)
@@ -156,7 +155,9 @@ class CLI:
 
         # Overwerite the start and end date if set.
         if args["start"]:
-            start = get_time_min(Datetime.strptime(args["start"], "%d %B %Y")).astimezone()
+            start = get_time_min(
+                Datetime.strptime(args["start"], "%d %B %Y")
+            ).astimezone()
         if args["end"]:
             end = get_time_max(Datetime.strptime(args["end"], "%d %B %Y")).astimezone()
 
@@ -190,10 +191,7 @@ class CLI:
         """Routine to navigate the data in a directory-like structure
 
         Args:
-            args (dict): The arguments from the argparser.
-
-        Returns:
-            _type_: _description_
+            args: The arguments from the argparser.
         """
 
         args = vars(self.argparser.parse_args())

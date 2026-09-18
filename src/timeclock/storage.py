@@ -12,7 +12,7 @@ from subprocess import call
 
 from .utils import datetime_from_string, format_datetime
 
-EDITOR = os.environ.get("EDITOR", "code")
+EDITOR = os.environ.get("EDITOR", "vim")
 
 
 class Slot:
