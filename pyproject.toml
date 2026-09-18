@@ -16,15 +16,35 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-dynamic = ["dependencies"]
-
-[tool.setuptools.dynamic]
-dependencies = {file = ["requirements.txt"]}
+dependencies = [
+    "argcomplete>=3.0.8",
+    "blessed>=1.20.0",
+    "GitPython>=3.1.30",
+    "holidays>=0.25",
+    "inquirer>=3.1.4",
+    "korean-lunar-calendar>=0.3.1",
+    "pycountry>=22.3.5",
+    "pyfiglet>=0.8.post1",
+    "python-dateutil>=2.8.2",
+    "python-editor>=1.0.4",
+    "PyYAML>=6.0.1",
+    "readchar>=4.0.5",
+    "six>=1.16.0",
+    "wcwidth>=0.2.12",
+]
 
 [tool.pytest.ini_options]
 pythonpath = [
   "src"
 ]
+
+[tool.pylint.format]
+max-line-length = 100
+
+[tool.pylint.design]
+max-args = 10
+max-positional-arguments = 10
+max-locals = 25
 
 [project.scripts]
 timeclock = "timeclock.cli:run"
