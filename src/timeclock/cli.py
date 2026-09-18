@@ -81,7 +81,7 @@ class CLI:
         """Edit the storage directly with the chosen editor.
 
         Args:
-            editor (str): The editor.
+            args: The arguments from the argparser.
         """
         args = vars(self.argparser.parse_args())
         editor = args["editor"]
@@ -91,7 +91,7 @@ class CLI:
         """Routine to start or stop the time tracking.
 
         Args:
-            args (dict): The arguments from the argparser.
+            args: The arguments from the argparser.
         """
         args = vars(self.argparser.parse_args())
         if self.version_control and self.version_control.is_behind():
@@ -135,7 +135,7 @@ class CLI:
         """Routine to print a summary for the chosen period.
 
         Args:
-            args (dict): The arguments from the argparser
+            args: The arguments from the argparser
         """
         args = vars(self.argparser.parse_args())
 
@@ -215,7 +215,7 @@ class CLI:
         """Take a vacation.
 
         Args:
-            args (dict): Args from the argparser.
+            args: Args from the argparser.
         """
         questions = [
             inquirer.Text(
@@ -242,7 +242,7 @@ class CLI:
         """Commit the changes.
 
         Args:
-            args (dict): Args from the argparser
+            args: Args from the argparser
         """
         del args
         if self.version_control.is_behind():
@@ -253,7 +253,7 @@ class CLI:
         """Push the changes.
 
         Args:
-            args (dict): Args from the argparser
+            args: Args from the argparser
         """
         del args
         self.version_control.push()
@@ -276,7 +276,7 @@ def configure(args: dict = None) -> None:
     locale: The current locale of the user to fetch local holidays
 
     Args:
-        args (dict): The arguments from the argparser.
+        args: The arguments from the argparser.
     """
     # print header if config is called for the first time
     if not args:
@@ -391,7 +391,7 @@ def initialize_parser(cli: CLI):
     """Initialize the argument parser for a cli.
 
     Args:
-        cli (CLI): The cli for which the parser should be initialized.
+        cli: The cli for which the parser should be initialized.
 
     Returns:
         argparser: The argparser.
@@ -537,7 +537,7 @@ def yes_no_question(question: str) -> bool:
     """Pose a yes/no question to the user.
 
     Args:
-        question (str): The question to be asked.
+        question: The question to be asked.
 
     Returns:
         bool: True if the answer was yes, False otherwise.

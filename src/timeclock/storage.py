@@ -58,7 +58,7 @@ class Slot:
         """Check if this slot's description contains keywords.
 
         Args:
-            keywords (list): A list of keywords to check for.
+            keywords: A list of keywords to check for.
 
         Returns:
             bool: True if the description contains one of the keywords, False otherwise.
@@ -77,8 +77,8 @@ class Slot:
         """Check if this slot lies within a certain timeframe.
 
         Args:
-            start (datetime): The start of the timeframe.
-            end (datetime): The end of the timeframe.
+            start: The start of the timeframe.
+            end: The end of the timeframe.
 
         Returns:
             bool: True if this slot starts or ends within the given timeframe, False otherwise.
@@ -93,9 +93,9 @@ def slot_from_dict(start: str = None, end: str = None, description: str = None) 
     """Create a new slot from a dict.
 
     Args:
-        start (str, optional): The start. Defaults to None.
-        end (str, optional): The end. Defaults to None.
-        description (str, optional): The description. Defaults to None.
+        start: The start. Defaults to None.
+        end: The end. Defaults to None.
+        description: The description. Defaults to None.
 
     Returns:
         _type_: _description_
@@ -116,9 +116,9 @@ class Storage(ABC):
         """Initialize the storage.
 
         Args:
-            data_dir (str): The path to the directory in which
+            data_dir: The path to the directory in which
             the file should be stored.
-            filename (str): The name of the data file.
+            filename: The name of the data file.
 
         Raises:
             InvalidStorageException: When the file is not loadable.
@@ -160,7 +160,7 @@ class Storage(ABC):
         """Create a new slot.
 
         Args:
-            start (datetime): The start time.
+            start: The start time.
         """
         self.data.append(Slot(start=start))
 
@@ -168,7 +168,7 @@ class Storage(ABC):
         """Get a specific slot.
 
         Args:
-            start (datetime): The start time.
+            start: The start time.
 
         Returns:
             dict|None: The slot with the specified start time, None otherwise.
@@ -184,10 +184,10 @@ class Storage(ABC):
         """Edit a specific slot.
 
         Args:
-            old_start (datetime): The start time of the slot to be edited.
-            new_start (datetime): The new start time.
-            end (datetime): The new end time.
-            description (str): The new description.
+            old_start: The start time of the slot to be edited.
+            new_start: The new start time.
+            end: The new end time.
+            description: The new description.
 
         Returns:
             bool: True if successful, false otherwise.
@@ -205,14 +205,14 @@ class Storage(ABC):
         """Directly edit the storage with an editor.
 
         Args:
-            editor (string): The editor to be used.
+            editor: The editor to be used.
         """
 
     def delete_slot(self, start: datetime) -> bool:
         """Delete a specific slot.
 
         Args:
-            start (datetime): The start time of the slot to be deleted.
+            start: The start time of the slot to be deleted.
 
         Returns:
             bool: True if successful, False otherwise.
@@ -251,9 +251,9 @@ class Storage(ABC):
         """Get all slots in a specific timeframe.
 
         Args:
-            start (date): The start of the timeframe.
-            end (date): The end of the timeframe.
-            keyword (list, optional): Keywords that have to be contained
+            start: The start of the timeframe.
+            end: The end of the timeframe.
+            keywords: Keywords that have to be contained
             by the slots. Defaults to [].
 
         Returns:

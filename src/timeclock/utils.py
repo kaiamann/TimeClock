@@ -38,7 +38,7 @@ def format_duration(duration: Timedelta) -> str:
     """Format a duration into a human readable string.
 
     Args:
-        duration (Timedelta): The duration to be formatted.
+        duration: The duration to be formatted.
 
     Returns:
         str: The formatted duration.
@@ -59,7 +59,7 @@ def format_date(date: Date) -> str:
     """Format a date into a human readable string.
 
     Args:
-        date (Date): The date to be formatted.
+        date: The date to be formatted.
 
     Returns:
         str: The formatted date.
@@ -71,8 +71,8 @@ def format_datetime(datetime: Datetime, time: bool = False) -> str:
     """Format a datetime into a human readable string.
 
     Args:
-        datetime (Datetime): The datetime to be formatted.
-        time (bool, optional): If true also prints the time. Defaults to False.
+        datetime: The datetime to be formatted.
+        time: If true also prints the time. Defaults to False.
 
     Returns:
         str: The formatted datetime.
@@ -86,7 +86,7 @@ def datetime_from_string(string: str) -> Datetime:
     """Parse a string into a datetime object.
 
     Args:
-        string (str): The string to be parsed.
+        string: The string to be parsed.
 
     Returns:
         Datetime: The datetime object.
@@ -100,7 +100,7 @@ def date_from_string(string: str) -> Datetime:
     """Parse a string into a date object.
 
     Args:
-        string (str): The string to be parsed.
+        string: The string to be parsed.
 
     Returns:
         Date: The date object.
@@ -111,7 +111,7 @@ def get_time_max(datetime: Datetime) -> Datetime:
     """Get the end of a day.
 
     Args:
-        datetime (Datetime): A day.
+        datetime: A day.
 
     Returns:
         Datetime: The end of the given day.
@@ -122,7 +122,7 @@ def get_time_min(datetime: Datetime) -> Datetime:
     """Get the beginning of a day.
 
     Args:
-        datetime (Datetime): A day.
+        datetime: A day.
 
     Returns:
         Datetime: The beginning of the day.
@@ -133,7 +133,7 @@ def get_week(datetime: Datetime) -> tuple[Datetime, Datetime]:
     """Get the start and end of the week for a particular date.
 
     Args:
-        date (Date): The reference date.
+        datetime: The reference date.
 
     Returns:
         (Date, Date): A tuple of dates containing (start,end) dates of the week.
@@ -146,7 +146,7 @@ def get_month(datetime: Datetime) -> tuple[Datetime, Datetime]:
     """Get the start and end of the month for a particular date.
 
     Args:
-        date (Date): The reference date.
+        datetime: The reference date.
 
     Returns:
         (Date, Date): A tuple of dates containing (start,end) dates of the month.
@@ -164,7 +164,7 @@ def parse_date(string: str) -> tuple[Datetime, str]:
     Also returns which type of format the string was in.
 
     Args:
-        string (str): The string to be parsed.
+        string: The string to be parsed.
 
     Raises:
         ValueError: When the string could not be parsed.

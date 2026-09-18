@@ -1,4 +1,5 @@
 """Test suite for the storage module"""
+
 from datetime import datetime as Datetime
 from datetime import timedelta as Timedelta
 
@@ -7,11 +8,13 @@ import pytest
 
 from timeclock.storage import Storage
 
+
 @pytest.fixture(autouse=True)
 def delete_data(empty_storage: Storage):
     """Delete the test datafile"""
     yield
     os.remove(empty_storage.data_path)
+
 
 @pytest.mark.usefixtures("delete_data")
 class TestEmptyStorage:
@@ -21,7 +24,7 @@ class TestEmptyStorage:
         """Test that the data file exists.
 
         Args:
-            empty_storage (Storage): The  Storage.
+            empty_storage: The  Storage.
         """
         assert os.path.exists(empty_storage.data_path)
 
@@ -29,7 +32,7 @@ class TestEmptyStorage:
         """Test that the storage handles save correctly.
 
         Args:
-            empty_storage (Storage): The  Storage.
+            empty_storage: The  Storage.
         """
         assert empty_storage.save()
 
@@ -37,7 +40,7 @@ class TestEmptyStorage:
         """Test that the storage handles empty load correctly.
 
         Args:
-            empty_storage (Storage): The  Storage
+            empty_storage: The  Storage
         """
         assert empty_storage.load()
 
@@ -53,7 +56,7 @@ class TestEmptyStorage:
         """Test that the storage returns None when a non existing slot is requested.
 
         Args:
-            empty_storage (Storage): The  Storage.
+            empty_storage: The  Storage.
         """
         datetime = Datetime.now()
         assert empty_storage.get_slot(datetime) is None
@@ -62,7 +65,7 @@ class TestEmptyStorage:
         """Test that the storage returns False when a non existing slot is deleted.
 
         Args:
-            empty_storage (Storage): The  Storage.
+            empty_storage: The  Storage.
         """
         assert not empty_storage.delete_slot(Datetime.now())
 
@@ -70,7 +73,7 @@ class TestEmptyStorage:
         """Test that the storage returns None when requesting the last slot on empty dataset.
 
         Args:
-            empty_storage (Storage): The  Storage.
+            empty_storage: The  Storage.
         """
         assert empty_storage.get_last_slot() is None
 
@@ -78,7 +81,7 @@ class TestEmptyStorage:
         """Test that the storage returns an empty list requesting multiple slots on empty dataset.
 
         Args:
-            empty_storage (Storage): The  Storage.
+            empty_storage: The  Storage.
         """
         start = Datetime.now()
         end = start + Timedelta(hours=1)
@@ -93,7 +96,7 @@ class TestInitializedStorage:
         """Test that the data file exists.
 
         Args:
-            initialized_storage (Storage): The Storage.
+            initialized_storage: The Storage.
         """
         assert os.path.exists(initialized_storage.data_path)
 
@@ -101,7 +104,7 @@ class TestInitializedStorage:
         """Test that the storage handles save correctly.
 
         Args:
-            initialized_storage (Storage): The Storage.
+            initialized_storage: The Storage.
         """
         assert initialized_storage.save()
 
@@ -109,54 +112,53 @@ class TestInitializedStorage:
         """Test that the storage handles empty load correctly.
 
         Args:
-            initialized_storage (Storage): The Storage
+            initialized_storage: The Storage
         """
         assert initialized_storage.load()
-
 
     def test_get_slot(self, slots, initialized_storage: Storage):
         """Test that the storage returns None when a non existing slot is requested.
 
         Args:
-            initialized_storage (Storage): The Storage.
+            initialized_storage: The Storage.
         """
         storage_slot = initialized_storage.data[-5]
-        assert storage_slot.start == slots[-5]['start']
-        assert storage_slot.end == slots[-5]['end']
-        assert storage_slot.description == slots[-5]['description']
+        assert storage_slot.start == slots[-5]["start"]
+        assert storage_slot.end == slots[-5]["end"]
+        assert storage_slot.description == slots[-5]["description"]
 
     def test_delete_slot(self, slots, initialized_storage: Storage):
         """Test that the storage returns False when a non existing slot is deleted.
 
         Args:
-            initialized_storage (Storage): The Storage.
+            initialized_storage: The Storage.
         """
-        assert initialized_storage.delete_slot(slots[-1]['start'])
+        assert initialized_storage.delete_slot(slots[-1]["start"])
         assert len(initialized_storage.data) == len(slots) - 1
 
     def test_get_last_slot(self, slots, initialized_storage: Storage):
         """Test that the storage returns None when requesting the last slot on empty dataset.
 
         Args:
-            initialized_storage (Storage): The Storage.
+            initialized_storage: The Storage.
         """
         last_slot = initialized_storage.get_last_slot()
-        assert last_slot.start == slots[-1]['start']
-        assert last_slot.end == slots[-1]['end']
-        assert last_slot.description == slots[-1]['description']
+        assert last_slot.start == slots[-1]["start"]
+        assert last_slot.end == slots[-1]["end"]
+        assert last_slot.description == slots[-1]["description"]
 
     def test_get_slots_between(self, slots, initialized_storage: Storage):
         """Test that the storage returns an empty list requesting multiple slots on empty dataset.
 
         Args:
-            initialized_storage (Storage): The Storage.
+            initialized_storage: The Storage.
         """
-        start = slots[0]['start']
-        end = slots[-1]['end']
+        start = slots[0]["start"]
+        end = slots[-1]["end"]
         storage_slots = initialized_storage.get_slots_between(start, end)
         assert len(initialized_storage.data) == len(slots)
         # assert len(slots) == len(get_slots)
         for i, storage_slot in enumerate(storage_slots):
-            assert slots[i]['start'] == storage_slot.start
-            assert slots[i]['end'] == storage_slot.end
-            assert slots[i]['description'] == storage_slot.description
+            assert slots[i]["start"] == storage_slot.start
+            assert slots[i]["end"] == storage_slot.end
+            assert slots[i]["description"] == storage_slot.description
